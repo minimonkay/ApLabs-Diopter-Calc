@@ -659,9 +659,103 @@ function renderLensTable() {
   refreshInputHints();
 }
 
+/* ---------- built-in manufacturer presets ----------
+   Verified against manufacturer spec sheets (see chat history for sources):
+   ARRI (arri.com), Zeiss Master/Ultra/Supreme (zeiss.com), Cooke (via AbelCine).
+   Close focus = manufacturer's stated MOD from image/sensor plane.
+   Lens length = manufacturer's stated front-to-mount-flange length.
+   These are read-only: they can be loaded but not saved over or deleted. */
+const BUILT_IN_SETS = {
+  'ARRI Signature Prime': [
+    ['15mm ARRI Signature Prime T1.8', '0.35m', '197mm', 'LPL'],
+    ['18mm ARRI Signature Prime T1.8', '0.35m', '178mm', 'LPL'],
+    ['21mm ARRI Signature Prime T1.8', '0.35m', '178mm', 'LPL'],
+    ['25mm ARRI Signature Prime T1.8', '0.35m', '178mm', 'LPL'],
+    ['29mm ARRI Signature Prime T1.8', '0.35m', '178mm', 'LPL'],
+    ['35mm ARRI Signature Prime T1.8', '0.35m', '178mm', 'LPL'],
+    ['40mm ARRI Signature Prime T1.8', '0.35m', '178mm', 'LPL'],
+    ['47mm ARRI Signature Prime T1.8', '0.45m', '178mm', 'LPL'],
+    ['58mm ARRI Signature Prime T1.8', '0.45m', '178mm', 'LPL'],
+    ['75mm ARRI Signature Prime T1.8', '0.65m', '178mm', 'LPL'],
+    ['95mm ARRI Signature Prime T1.8', '0.85m', '178mm', 'LPL'],
+    ['125mm ARRI Signature Prime T1.8', '1m', '178mm', 'LPL'],
+  ],
+  'ARRI/Zeiss Master Prime': [
+    ['12mm ARRI/Zeiss Master Prime T1.3', '0.40m', '197mm', 'PL'],
+    ['14mm ARRI/Zeiss Master Prime T1.3', '0.35m', '172mm', 'PL'],
+    ['16mm ARRI/Zeiss Master Prime T1.3', '0.35m', '153mm', 'PL'],
+    ['18mm ARRI/Zeiss Master Prime T1.3', '0.35m', '153mm', 'PL'],
+    ['21mm ARRI/Zeiss Master Prime T1.3', '0.35m', '153mm', 'PL'],
+    ['25mm ARRI/Zeiss Master Prime T1.3', '0.35m', '153mm', 'PL'],
+    ['27mm ARRI/Zeiss Master Prime T1.3', '0.35m', '153mm', 'PL'],
+    ['32mm ARRI/Zeiss Master Prime T1.3', '0.35m', '153mm', 'PL'],
+    ['35mm ARRI/Zeiss Master Prime T1.3', '0.35m', '153mm', 'PL'],
+    ['40mm ARRI/Zeiss Master Prime T1.3', '0.40m', '153mm', 'PL'],
+    ['50mm ARRI/Zeiss Master Prime T1.3', '0.50m', '153mm', 'PL'],
+    ['65mm ARRI/Zeiss Master Prime T1.3', '0.65m', '153mm', 'PL'],
+    ['75mm ARRI/Zeiss Master Prime T1.3', '0.80m', '153mm', 'PL'],
+    ['100mm ARRI/Zeiss Master Prime T1.3', '1.00m', '153mm', 'PL'],
+    ['135mm ARRI/Zeiss Master Prime T1.3', '0.95m', '172mm', 'PL'],
+    ['150mm ARRI/Zeiss Master Prime T1.3', '1.50m', '210mm', 'PL'],
+  ],
+  'ARRI/Zeiss Ultra Prime': [
+    ['8R ARRI/Zeiss Ultra Prime T2.8', '0.35m', '130mm', 'PL'],
+    ['10mm ARRI/Zeiss Ultra Prime T2.1', '0.35m', '172mm', 'PL'],
+    ['12mm ARRI/Zeiss Ultra Prime T2', '0.30m', '140mm', 'PL'],
+    ['14mm ARRI/Zeiss Ultra Prime T1.9', '0.22m', '112mm', 'PL'],
+    ['16mm ARRI/Zeiss Ultra Prime T1.9', '0.25m', '94mm', 'PL'],
+    ['20mm ARRI/Zeiss Ultra Prime T1.9', '0.28m', '91mm', 'PL'],
+    ['24mm ARRI/Zeiss Ultra Prime T1.9', '0.30m', '91mm', 'PL'],
+    ['28mm ARRI/Zeiss Ultra Prime T1.9', '0.28m', '91mm', 'PL'],
+    ['32mm ARRI/Zeiss Ultra Prime T1.9', '0.35m', '91mm', 'PL'],
+    ['40mm ARRI/Zeiss Ultra Prime T1.9', '0.38m', '91mm', 'PL'],
+    ['50mm ARRI/Zeiss Ultra Prime T1.9', '0.60m', '91mm', 'PL'],
+    ['65mm ARRI/Zeiss Ultra Prime T1.9', '0.65m', '91mm', 'PL'],
+    ['85mm ARRI/Zeiss Ultra Prime T1.9', '0.90m', '91mm', 'PL'],
+    ['100mm ARRI/Zeiss Ultra Prime T1.9', '1.0m', '91mm', 'PL'],
+    ['135mm ARRI/Zeiss Ultra Prime T1.9', '1.5m', '119mm', 'PL'],
+    ['180mm ARRI/Zeiss Ultra Prime T1.9', '2.6m', '166mm', 'PL'],
+  ],
+  'Zeiss Supreme Prime': [
+    ['15mm Zeiss Supreme Prime T1.8', '0.35m', '149mm', 'PL'],
+    ['18mm Zeiss Supreme Prime T1.5', '0.35m', '163mm', 'PL'],
+    ['21mm Zeiss Supreme Prime T1.5', '0.35m', '120mm', 'PL'],
+    ['25mm Zeiss Supreme Prime T1.5', '0.26m', '119mm', 'PL'],
+    ['29mm Zeiss Supreme Prime T1.5', '0.33m', '121mm', 'PL'],
+    ['35mm Zeiss Supreme Prime T1.5', '0.32m', '119mm', 'PL'],
+    ['40mm Zeiss Supreme Prime T1.5', '0.42m', '121mm', 'PL'],
+    ['50mm Zeiss Supreme Prime T1.5', '0.45m', '119mm', 'PL'],
+    ['65mm Zeiss Supreme Prime T1.5', '0.6m', '121mm', 'PL'],
+    ['85mm Zeiss Supreme Prime T1.5', '0.84m', '119mm', 'PL'],
+    ['100mm Zeiss Supreme Prime T1.5', '1.1m', '119mm', 'PL'],
+    ['135mm Zeiss Supreme Prime T1.5', '1.4m', '146mm', 'PL'],
+    ['150mm Zeiss Supreme Prime T1.8', '1.5m', '146mm', 'PL'],
+    ['200mm Zeiss Supreme Prime T2.2', '2m', '183mm', 'PL'],
+  ],
+  'Cooke S7/i Full Frame Plus': [
+    ['16mm Cooke S7/i T2.0', '16"', '7.8"', 'PL'],
+    ['18mm Cooke S7/i T2.0', '16"', '7.8"', 'PL'],
+    ['21mm Cooke S7/i T2.0', '16"', '7.8"', 'PL'],
+    ['25mm Cooke S7/i T2.0', '14"', '7.2"', 'PL'],
+    ['32mm Cooke S7/i T2.0', '14"', '7.0"', 'PL'],
+    ['40mm Cooke S7/i T2.0', '18"', '7.4"', 'PL'],
+    ['50mm Cooke S7/i T2.0', '20"', '7.4"', 'PL'],
+    ['65mm Cooke S7/i T2.0', '20"', '7.4"', 'PL'],
+    ['75mm Cooke S7/i T2.0', '19"', '7.4"', 'PL'],
+    ["100mm Cooke S7/i T2.0", "2'6\"", '7.4"', 'PL'],
+    ["135mm Cooke S7/i T2.0", "3'3\"", '7.4"', 'PL'],
+    ["180mm Cooke S7/i T2.0", "4'3\"", '7.8"', 'PL'],
+  ],
+};
+function builtInAsLensArray(name) {
+  return BUILT_IN_SETS[name].map(([lensName, cf, lensLen, mount]) => ({ name: lensName, cf, lensLen, mount, mountCustom: '' }));
+}
+
 /* ---------- saved lens sets (browser storage, guarded) ----------
    Storage may be unavailable (private windows, sandboxed previews). Everything
-   is wrapped so the rest of the app is unaffected; controls disable with a note. */
+   is wrapped so the rest of the app is unaffected; controls disable with a note.
+   Built-in presets above always work regardless of storage — only saving your
+   own sets needs it. */
 const STORE_KEY = 'diopterCalc.lensSets';
 const storageOK = (() => {
   try {
@@ -681,16 +775,20 @@ function writeStore(sets) {
 }
 function refreshSetSelect(selectName) {
   const select = el('setSelect');
-  const names = Object.keys(readStore()).sort((a, b) => a.localeCompare(b));
-  select.innerHTML = names.length
-    ? names.map(n => `<option value="${escapeAttr(n)}">${escapeText(n)}</option>`).join('')
-    : '<option value="">(no saved sets)</option>';
-  if (selectName && names.includes(selectName)) select.value = selectName;
+  const builtInNames = Object.keys(BUILT_IN_SETS);
+  const savedNames = storageOK ? Object.keys(readStore()).sort((a, b) => a.localeCompare(b)) : [];
+  const builtInHtml = `<optgroup label="Built-in presets">${builtInNames.map(n => `<option value="${escapeAttr(n)}">${escapeText(n)}</option>`).join('')}</optgroup>`;
+  const savedHtml = storageOK
+    ? `<optgroup label="Your saved sets">${savedNames.length ? savedNames.map(n => `<option value="${escapeAttr(n)}">${escapeText(n)}</option>`).join('') : '<option value="" disabled>(none yet)</option>'}</optgroup>`
+    : '';
+  select.innerHTML = builtInHtml + savedHtml;
+  if (selectName && (builtInNames.includes(selectName) || savedNames.includes(selectName))) select.value = selectName;
 }
 function saveCurrentSet() {
   if (state.lenses.length === 0) { alert('Add some lenses first.'); return; }
   const name = (prompt('Name this lens set:') || '').trim();
   if (!name) return;
+  if (BUILT_IN_SETS[name]) { alert('That name is used by a built-in preset — choose another name.'); return; }
   const sets = readStore();
   if (sets[name] && !confirm(`"${name}" already exists. Overwrite it?`)) return;
   sets[name] = state.lenses.map(l => ({ name: l.name, cf: l.cf, lensLen: l.lensLen, mount: l.mount || '', mountCustom: l.mountCustom || '' }));
@@ -699,16 +797,23 @@ function saveCurrentSet() {
 }
 function loadSelectedSet() {
   const name = el('setSelect').value;
-  const sets = readStore();
-  if (!name || !sets[name]) { alert('No saved set selected.'); return; }
+  if (!name) { alert('No saved set selected.'); return; }
   const hasContent = state.lenses.some(l => (l.name || l.cf || l.lensLen));
   if (hasContent && !confirm(`Replace the current lens table with "${name}"?`)) return;
-  state.lenses = sets[name].map(l => ({ id: state.nextId++, name: l.name || '', cf: l.cf || '', lensLen: l.lensLen || '', mount: l.mount || '', mountCustom: l.mountCustom || '' }));
+
+  if (BUILT_IN_SETS[name]) {
+    state.lenses = builtInAsLensArray(name).map(l => ({ id: state.nextId++, ...l }));
+  } else {
+    const sets = readStore();
+    if (!sets[name]) { alert('No saved set selected.'); return; }
+    state.lenses = sets[name].map(l => ({ id: state.nextId++, name: l.name || '', cf: l.cf || '', lensLen: l.lensLen || '', mount: l.mount || '', mountCustom: l.mountCustom || '' }));
+  }
   renderLensTable();
   renderOutputs();
 }
 function deleteSelectedSet() {
   const name = el('setSelect').value;
+  if (BUILT_IN_SETS[name]) { alert('Built-in presets can\'t be deleted.'); return; }
   const sets = readStore();
   if (!name || !sets[name]) { alert('No saved set selected.'); return; }
   if (!confirm(`Delete saved set "${name}"?`)) return;
@@ -717,11 +822,13 @@ function deleteSelectedSet() {
   refreshSetSelect();
 }
 function initSavedSets() {
+  el('btnLoadSet').disabled = false;
+  el('setSelect').disabled = false;
   if (!storageOK) {
-    ['btnLoadSet', 'btnSaveSet', 'btnDeleteSet', 'setSelect'].forEach(id => { el(id).disabled = true; });
-    el('storageNote').textContent = 'Browser storage isn\'t available in this environment, so saved sets are disabled here — they work when the file is opened directly in a browser or hosted on a site.';
-    el('setSelect').innerHTML = '<option value="">(unavailable)</option>';
-    return;
+    ['btnSaveSet', 'btnDeleteSet'].forEach(id => { el(id).disabled = true; });
+    el('storageNote').textContent = 'Built-in manufacturer presets always work. Saving your own sets needs browser storage, which isn\'t available in this environment — that part works when the file is opened directly in a browser or hosted on a site.';
+  } else {
+    el('storageNote').textContent = 'Your saved sets are stored in this browser only. Built-in presets are always available.';
   }
   refreshSetSelect();
 }
@@ -789,8 +896,11 @@ function renderChart({ gap, reference, lensData }) {
 
   lensData.forEach((ld, idx) => {
     const gb = groupBounds[idx];
-    svg += `<text x="6" y="${gb.top + 14}" fill="#111" font-weight="bold">${escapeText(ld.lens.name)}</text>`;
     const mx = scaleX(ld.marker);
+    // Reserve the space up to the marker line for the name; truncated with an
+    // ellipsis after render if it doesn't fit (measured, not guessed).
+    const nameMaxWidth = Math.max(30, mx - 12);
+    svg += `<text class="lensname" data-full="${escapeAttr(ld.lens.name)}" data-maxw="${nameMaxWidth}" x="6" y="${gb.top + 14}" fill="#111" font-weight="bold"><title>${escapeText(ld.lens.name)}</title>${escapeText(ld.lens.name)}</text>`;
     svg += `<line x1="${mx}" y1="${gb.top + 2}" x2="${mx}" y2="${gb.top + headerHeight - 2}" stroke="#1a7a4c" stroke-width="2.5"/>`;
     // Value of the close-focus marker, so the reference point is readable without
     // cross-checking the lens table. Flips to the left of the line near the edge.
@@ -830,6 +940,21 @@ function renderChart({ gap, reference, lensData }) {
       const farLabel = container.querySelector('#' + t.getAttribute('data-far'));
       if (farLabel) farLabel.textContent += ` (${t.textContent})`;
       t.remove();
+    }
+  });
+
+  // Long lens names: shorten with an ellipsis until they clear the space
+  // reserved before the green CF marker line. Full name stays on hover.
+  container.querySelectorAll('text.lensname').forEach(t => {
+    const maxW = parseFloat(t.getAttribute('data-maxw'));
+    const full = t.getAttribute('data-full');
+    const titleEl = t.querySelector('title');
+    if (t.getBBox().width <= maxW) return;
+    let shown = full;
+    while (shown.length > 1 && t.getBBox().width > maxW) {
+      shown = shown.slice(0, -1);
+      t.textContent = shown.trimEnd() + '…';
+      if (titleEl) t.insertBefore(titleEl, t.firstChild); // textContent wipes children — restore the tooltip
     }
   });
 }
