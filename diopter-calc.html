@@ -11,7 +11,7 @@
          max-width: 980px; margin: 0 auto; padding: 24px 18px 60px; color: #1c1c1c; line-height: 1.45; }
 
   h1 { font-size: 24px; margin: 0 0 4px; }
-  .tagline { color: var(--muted); font-size: 14px; margin: 0 0 24px; }
+  .tagline { color: var(--muted); font-size: 14px; margin: 0 0 6px; }
 
   /* ---- sections ---- */
   section { border-top: 1px solid var(--line); padding-top: 20px; margin-top: 28px; }
@@ -87,6 +87,7 @@
 <body>
 
 <h1>Aperture Laboratories&rsquo; Diopter Calc</h1>
+<p class="note" id="versionNote" style="margin:0 0 4px"></p>
 <noscript>
   <p style="background:#fdecea;border:1px solid #e0a9a3;border-radius:6px;padding:12px 14px;
             font-size:14px;color:#7a2018;margin:0 0 20px">
@@ -97,6 +98,9 @@
   </p>
 </noscript>
 <p class="tagline">Work out the near and far focus limits your diopters give you, for every lens in your set.</p>
+<p class="note" style="margin:0 0 24px">
+  <a href="#" id="feedbackLink" style="color:inherit">Found a bug, or have a suggestion? Send feedback</a>
+</p>
 
 <!-- ============ STEP 1 ============ -->
 <section>
@@ -253,6 +257,7 @@
 <script>
 'use strict';
 // [pure-core-start]
+const APP_VERSION = 'v8'; // bump this on every revision — shown under the title
 const M_PER_FT = 0.3048;
 
 /* Flange focal depth by mount type — the fixed distance from the mount's contact
@@ -1211,6 +1216,11 @@ function exportResultsCSV() {
 /* ---------- init ---------- */
 initSavedSets();
 renderUnitDefaultNote();
+el('versionNote').textContent = APP_VERSION;
+
+const feedbackSubject = encodeURIComponent(`Diopter Calc feedback (${APP_VERSION})`);
+const feedbackBody = encodeURIComponent(`Version: ${APP_VERSION}\n\n(Describe the bug or suggestion here)\n`);
+el('feedbackLink').href = `mailto:irwinsamj@gmail.com?subject=${feedbackSubject}&body=${feedbackBody}`;
 renderDiopterTable();
 addLens(); // start with one empty row for convenience
 </script>
