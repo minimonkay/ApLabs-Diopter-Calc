@@ -4,73 +4,155 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Aperture Laboratories&#39; Diopter Calc</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root { --line: #d8d8d8; --muted: #5c5c5c; --accent: #a3273a; --bg-soft: #f7f7f8; }
-  * { box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
-         max-width: 980px; margin: 0 auto; padding: 24px 18px 60px; color: #1c1c1c; line-height: 1.45; }
+  /* ---- design tokens ----
+     Palette reads as measuring instrument, not brand site: graphite text,
+     cool paper background, one warm amber accent (lens-coating gold) for
+     action and emphasis. Green/red/blue stay as-is — they're the chart's
+     already-learned meaning (CF marker / positive / negative diopter). */
+  :root {
+    --ink: #1b1d1e;
+    --steel: #5b6266;
+    --paper: #f3f4f1;
+    --surface: #ffffff;
+    --line: #dcdfda;
+    --amber: #b8752e;
+    --amber-deep: #8f5a20;
+    --amber-soft: #f2e5d2;
+    --focus-green: #1a7a4c;
+    --warn-red: #a3273a;
+    --diopter-blue: #4c6b8a;
+    --radius: 7px;
 
-  h1 { font-size: 24px; margin: 0 0 4px; }
-  .tagline { color: var(--muted); font-size: 14px; margin: 0 0 6px; }
+    /* kept for backward compatibility with existing rules/selectors below */
+    --muted: var(--steel);
+    --accent: var(--warn-red);
+    --bg-soft: #eceee9;
+
+    --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    font-family: var(--font-sans);
+    max-width: 980px; margin: 0 auto; padding: 28px 18px 60px;
+    color: var(--ink); line-height: 1.5; background: var(--paper);
+  }
+
+  h1 { font-family: var(--font-sans); font-weight: 700; font-size: 25px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .tagline { color: var(--steel); font-size: 14px; margin: 0 0 6px; }
 
   /* ---- sections ---- */
-  section { border-top: 1px solid var(--line); padding-top: 20px; margin-top: 28px; }
+  section { border-top: 1px solid var(--line); padding-top: 22px; margin-top: 30px; }
   section:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
-  .step-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
-  .step-num { flex: none; width: 24px; height: 24px; border-radius: 50%; background: #1c1c1c; color: #fff;
-              font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center;
-              align-self: center; }
-  h2 { font-size: 18px; margin: 0; }
-  .lead { font-size: 14px; margin: 0 0 14px 34px; color: #333; }
+  .step-head { display: flex; align-items: center; gap: 11px; margin-bottom: 5px; }
+  .step-num {
+    flex: none; width: 26px; height: 26px; border-radius: 50%;
+    background: var(--surface); color: var(--amber-deep);
+    border: 1.5px solid var(--amber); font-family: var(--font-mono);
+    font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;
+  }
+  h2 { font-family: var(--font-sans); font-weight: 600; font-size: 18px; margin: 0; letter-spacing: -0.005em; }
+  .lead { font-size: 14px; margin: 0 0 14px 37px; color: #3a3d3e; }
 
   /* ---- collapsible detail ---- */
   details { margin-top: 10px; border-left: 3px solid var(--line); padding-left: 12px; }
-  summary { cursor: pointer; font-size: 13px; color: var(--muted); user-select: none; padding: 3px 0; }
-  summary:hover { color: #000; }
-  details[open] summary { margin-bottom: 6px; }
-  details .body { font-size: 13px; color: #444; }
+  summary { cursor: pointer; font-size: 13px; color: var(--steel); user-select: none; padding: 3px 0; transition: color .12s ease; }
+  summary:hover { color: var(--amber-deep); }
+  details[open] summary { margin-bottom: 6px; color: var(--ink); }
+  details .body { font-size: 13px; color: #3f4243; }
   details .body p { margin: 6px 0; }
-  details code { background: var(--bg-soft); padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+  details code {
+    background: var(--amber-soft); color: var(--amber-deep); font-family: var(--font-mono);
+    padding: 1px 5px; border-radius: 3px; font-size: 12px;
+  }
 
   /* ---- controls ---- */
   .row { display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-start; }
   .control { min-width: 0; }
-  .control > .label { font-size: 12px; font-weight: 600; text-transform: uppercase;
-                      letter-spacing: 0.04em; color: var(--muted); margin-bottom: 5px; }
+  .control > .label {
+    font-family: var(--font-mono); font-size: 11px; font-weight: 500; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--steel); margin-bottom: 6px;
+  }
   label { font-size: 14px; margin-right: 14px; }
-  label.opt { display: inline-flex; align-items: center; gap: 5px; }
-  input[type=text] { padding: 5px 7px; border: 1px solid #bbb; border-radius: 4px; font-size: 13px; }
+  label.opt { display: inline-flex; align-items: center; gap: 6px; }
+  input[type=radio] { accent-color: var(--amber-deep); }
+
+  input[type=text] {
+    padding: 6px 9px; border: 1px solid #c6c9c4; border-radius: var(--radius);
+    font-size: 13px; font-family: var(--font-sans); background: var(--surface); color: var(--ink);
+    transition: border-color .12s ease, box-shadow .12s ease;
+  }
+  input[type=text]:focus { outline: none; border-color: var(--amber); box-shadow: 0 0 0 3px var(--amber-soft); }
   input.narrow { width: 140px; }
-  input.bad { border-color: #c0392b; outline: 1px solid #c0392b; }
-  select { padding: 5px; border: 1px solid #bbb; border-radius: 4px; font-size: 13px; }
-  button { padding: 6px 12px; cursor: pointer; font-size: 13px; border: 1px solid #bbb;
-           background: #fff; border-radius: 4px; }
-  button:hover:not(:disabled) { background: var(--bg-soft); }
+  input.bad { border-color: var(--warn-red) !important; box-shadow: 0 0 0 3px #f3dde1 !important; }
+  input.dist, input.num, #mountingGap {
+    font-family: var(--font-mono); text-align: right; font-variant-numeric: tabular-nums;
+  }
+
+  select {
+    padding: 6px 8px; border: 1px solid #c6c9c4; border-radius: var(--radius);
+    font-size: 13px; font-family: var(--font-sans); background: var(--surface); color: var(--ink);
+  }
+
+  button {
+    padding: 7px 13px; cursor: pointer; font-size: 13px; font-family: var(--font-sans); font-weight: 500;
+    border: 1px solid #c6c9c4; background: var(--surface); color: var(--ink); border-radius: var(--radius);
+    transition: background .12s ease, border-color .12s ease, transform .05s ease;
+  }
+  button:hover:not(:disabled) { background: var(--paper); border-color: #b7bab4; }
+  button:active:not(:disabled) { transform: translateY(1px); }
   button:disabled { cursor: default; opacity: 0.45; }
-  button.primary { background: #1c1c1c; color: #fff; border-color: #1c1c1c; }
-  button.primary:hover:not(:disabled) { background: #333; }
+  button.primary { background: var(--amber-deep); color: #fff; border-color: var(--amber-deep); }
+  button.primary:hover:not(:disabled) { background: #764a1a; border-color: #764a1a; }
+
+  :focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 
   /* ---- tables ---- */
-  table { border-collapse: collapse; width: 100%; margin-top: 10px; font-size: 13px; }
-  th, td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
-  th { background: var(--bg-soft); font-size: 12px; font-weight: 600; }
-  th .sub { display: block; font-weight: 400; color: var(--muted); font-size: 11px; }
-  .add-row td { border-top: 2px solid #aaa; background: var(--bg-soft); }
+  table { border-collapse: collapse; width: 100%; margin-top: 10px; font-size: 13px; background: var(--surface); }
+  th, td { border: 1px solid var(--line); padding: 7px 9px; text-align: left; vertical-align: top; }
+  th {
+    background: var(--bg-soft); font-family: var(--font-mono); font-size: 11px;
+    font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: var(--steel);
+  }
+  th .sub { display: block; font-weight: 400; text-transform: none; letter-spacing: normal; color: #8a8f89; font-size: 11px; font-family: var(--font-sans); margin-top: 2px; }
+  .add-row td { border-top: 2px solid #c6c9c4; background: var(--paper); }
   #resultsTable tr.lens-even td { background: var(--bg-soft); }
-  #resultsTable tr.lens-odd td { background: #fff; }
+  #resultsTable tr.lens-odd td { background: var(--surface); }
+  /* Numeric result columns: right-aligned tabular mono reads down a column
+     far more easily than left-aligned text. */
+  #resultsTable td:nth-child(n+2), #resultsTable th:nth-child(n+2) { text-align: right; }
+  #resultsTable td:nth-child(n+2) { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  #resultsTable td:first-child, #resultsTable th:first-child { text-align: left; }
 
-  .rm { color: var(--accent); cursor: pointer; font-size: 12px; margin-left: 6px; }
-  .mv { color: #555; cursor: pointer; font-size: 13px; margin-right: 5px; user-select: none; }
-  .mv:hover { color: #000; }
-  .note { font-size: 12px; color: var(--muted); }
-  .invalid { color: var(--accent); font-style: italic; }
+  .rm { color: var(--warn-red); cursor: pointer; font-size: 12px; margin-left: 6px; }
+  .mv { color: var(--steel); cursor: pointer; font-size: 13px; margin-right: 5px; user-select: none; }
+  .mv:hover { color: var(--ink); }
+  .note { font-size: 12px; color: var(--steel); }
+  .invalid { color: var(--warn-red); font-style: italic; }
 
   /* ---- toolbars ---- */
   .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
   .toolbar .spacer { flex: 1 1 auto; }
-  .breakdown { background: var(--bg-soft); border: 1px solid var(--line); border-radius: 6px;
-               padding: 10px 12px; margin-top: 12px; font-size: 13px; }
-  .breakdown .calc { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; white-space: pre-wrap; }
+  .breakdown {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 12px 14px; margin-top: 12px; font-size: 13px;
+  }
+  .breakdown .calc {
+    font-family: var(--font-mono); font-size: 12.5px; white-space: pre-wrap;
+    background: var(--paper); border-radius: 4px; padding: 3px 8px; margin: 2px 0; display: inline-block;
+  }
+
+  .gap-diagram {
+    display: block; width: 100%; max-width: 500px; height: auto;
+    margin-top: 10px; padding: 10px 6px 4px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  }
+  a { color: var(--amber-deep); }
 
   @media print {
     body * { visibility: hidden; }
@@ -81,6 +163,9 @@
   @media (max-width: 620px) {
     .row { gap: 14px; }
     .lead { margin-left: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
   }
 </style>
 </head>
@@ -125,6 +210,64 @@
       <input type="text" class="narrow" id="mountingGap" placeholder="e.g. 1&quot; or 3mm" oninput="onDistanceInput(this)">
     </div>
   </div>
+
+  <svg class="gap-diagram" viewBox="0 0 440 150" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing lens mount, front of lens, lens length, flange depth, mounting gap, subject distance, and the diopter">
+    <!-- camera body, extending all the way to the mount -->
+    <rect x="6" y="50" width="66" height="40" rx="2" fill="var(--bg-soft)" stroke="var(--ink)" stroke-width="1.2"/>
+
+    <!-- film plane: symbol + dotted line, inside the camera body -->
+    <line x1="36" y1="44" x2="36" y2="96" stroke="var(--steel)" stroke-width="1" stroke-dasharray="1.5,2.5"/>
+    <text x="36" y="115" text-anchor="middle" font-size="16" font-family="var(--font-mono)" fill="var(--steel)">&#981;</text>
+
+    <!-- flange depth: dimension row above, between film plane and mount -->
+    <line x1="36" y1="16" x2="72" y2="16" stroke="var(--steel)" stroke-width="1"/>
+    <line x1="36" y1="11" x2="36" y2="21" stroke="var(--steel)" stroke-width="1"/>
+    <line x1="72" y1="11" x2="72" y2="21" stroke="var(--steel)" stroke-width="1"/>
+    <text x="54" y="9" text-anchor="middle" font-size="8.5" fill="var(--steel)">flange depth</text>
+
+    <!-- lens body: narrow at the mount, wide at the front, mount shown as a thick bar -->
+    <path d="M72,58 L182,40 L182,100 L72,82 Z" fill="var(--bg-soft)" stroke="var(--ink)" stroke-width="1.2"/>
+    <line x1="72" y1="58" x2="72" y2="82" stroke="var(--ink)" stroke-width="4"/>
+
+    <!-- point labels -->
+    <text x="72" y="45" text-anchor="middle" font-size="10" fill="var(--ink)">Lens mount</text>
+    <text x="182" y="32" text-anchor="middle" font-size="10" fill="var(--ink)">Front of lens</text>
+
+    <!-- boundary extension lines, dotted, kept clear of the lens's own outline -->
+    <line x1="72" y1="86" x2="72" y2="122" stroke="var(--ink)" stroke-width="1" stroke-dasharray="1.5,2.5"/>
+    <line x1="182" y1="104" x2="182" y2="122" stroke="var(--ink)" stroke-width="1" stroke-dasharray="1.5,2.5"/>
+
+    <!-- diopter -->
+    <ellipse cx="212" cy="70" rx="7" ry="26" fill="var(--amber-soft)" stroke="var(--amber-deep)" stroke-width="1.3"/>
+    <text x="212" y="112" text-anchor="middle" font-size="10" fill="var(--ink)">Diopter</text>
+
+    <!-- subject: simple eye (also a classic macro subject) -->
+    <g id="subject">
+      <path d="M316,55 Q330,42 344,55 Q330,68 316,55 Z" fill="var(--surface)" stroke="var(--ink)" stroke-width="1.2"/>
+      <circle cx="330" cy="55" r="7" fill="var(--amber-soft)" stroke="var(--amber-deep)" stroke-width="1.1"/>
+      <circle cx="330" cy="55" r="3" fill="var(--ink)"/>
+    </g>
+    <text x="330" y="112" text-anchor="middle" font-size="10" fill="var(--ink)">Subject</text>
+
+    <!-- bottom dimension row: consistent small gap at every boundary, each measured
+         to the true reference point (front-of-lens at 182, diopter CENTRE at 212) —
+         not to any edge, so it can't read as "front of diopter" vs "back of diopter" -->
+    <line x1="72" y1="128" x2="179" y2="128" stroke="var(--steel)" stroke-width="1"/>
+    <line x1="72" y1="123" x2="72" y2="133" stroke="var(--steel)" stroke-width="1"/>
+    <line x1="179" y1="123" x2="179" y2="133" stroke="var(--steel)" stroke-width="1"/>
+    <text x="125" y="145" text-anchor="middle" font-size="9" fill="var(--steel)">Lens length</text>
+
+    <line x1="185" y1="128" x2="209" y2="128" stroke="var(--amber-deep)" stroke-width="1.3"/>
+    <line x1="185" y1="123" x2="185" y2="133" stroke="var(--amber-deep)" stroke-width="1.3"/>
+    <line x1="209" y1="123" x2="209" y2="133" stroke="var(--amber-deep)" stroke-width="1.3"/>
+    <text x="197" y="145" text-anchor="middle" font-size="9" font-weight="600" fill="var(--amber-deep)">mounting gap</text>
+
+    <line x1="215" y1="128" x2="330" y2="128" stroke="var(--steel)" stroke-width="1"/>
+    <line x1="215" y1="123" x2="215" y2="133" stroke="var(--steel)" stroke-width="1"/>
+    <line x1="330" y1="123" x2="330" y2="133" stroke="var(--steel)" stroke-width="1"/>
+    <text x="272" y="145" text-anchor="middle" font-size="9" fill="var(--steel)">Subject distance (SD)</text>
+  </svg>
+  <p class="note" style="margin:2px 0 14px">Not the front glass element — lens length and the gap are both measured to the mounting points, not the optics. This gap applies to every lens. Subject distance (SD) is the same term used in the worked example at the bottom of the page.</p>
 
   <details>
     <summary>More about these settings</summary>
@@ -178,8 +321,9 @@
     <span class="spacer"></span>
     <label class="note" style="margin:0">Import CSV <input type="file" accept=".csv" id="csvImport" onchange="handleCSVImport(this.files[0])"></label>
     <button onclick="downloadCSVTemplate()">Template</button>
+    <button onclick="exportLensesCSV()">Export lenses</button>
   </div>
-  <p class="note" id="storageNote" style="margin:0 0 4px">Saved sets are stored in this browser only.</p>
+  <p class="note" id="storageNote" style="margin:0 0 4px">Saved sets are stored in this browser only. Export lenses to send your current set to someone else — they can load it with Import CSV.</p>
 
   <table id="lensTable">
     <thead>
@@ -256,7 +400,7 @@
 <script>
 'use strict';
 // [pure-core-start]
-const APP_VERSION = 'v8'; // bump this on every revision — shown under the title
+const APP_VERSION = 'v9'; // bump this on every revision — shown under the title
 const M_PER_FT = 0.3048;
 
 /* Flange focal depth by mount type — the fixed distance from the mount's contact
@@ -555,7 +699,7 @@ function refreshInputHints() {
 function renderDiopterTable() {
   document.querySelector('#diopterTable tbody').innerHTML = state.diopters.map(dp => `
     <tr>
-      <td><input type="text" class="narrow" value="${dp.power === null || dp.power === undefined ? '' : escapeAttr(String(dp.power))}" placeholder="e.g. +1.5 or -0.5"
+      <td><input type="text" class="narrow num" value="${dp.power === null || dp.power === undefined ? '' : escapeAttr(String(dp.power))}" placeholder="e.g. +1.5 or -0.5"
             oninput="onDiopterPowerInput(${dp.id}, this)" onblur="onDiopterPowerBlur(${dp.id}, this)"></td>
       <td><input type="text" class="narrow dist" value="${escapeAttr(dp.thickness || '')}" placeholder="e.g. 15mm (optional)"
             oninput="onDiopterThicknessInput(${dp.id}, this)"></td>
@@ -830,9 +974,9 @@ function initSavedSets() {
   el('setSelect').disabled = false;
   if (!storageOK) {
     ['btnSaveSet', 'btnDeleteSet'].forEach(id => { el(id).disabled = true; });
-    el('storageNote').textContent = 'Built-in manufacturer presets always work. Saving your own sets needs browser storage, which isn\'t available in this environment — that part works when the file is opened directly in a browser or hosted on a site.';
+    el('storageNote').textContent = 'Built-in manufacturer presets always work. Saving your own sets needs browser storage, which isn\'t available in this environment — that part works when the file is opened directly in a browser or hosted on a site. Export lenses works regardless, and lets you send your current set to someone else to load via Import CSV.';
   } else {
-    el('storageNote').textContent = 'Your saved sets are stored in this browser only. Built-in presets are always available.';
+    el('storageNote').textContent = 'Your saved sets are stored in this browser only. Built-in presets are always available. Export lenses to send your current set to someone else — they can load it with Import CSV.';
   }
   refreshSetSelect();
 }
@@ -886,16 +1030,16 @@ function renderChart({ gap, reference, lensData }) {
   let svg = `<svg viewBox="0 0 ${chartWidth} ${chartHeight}" width="100%" style="max-width:${chartWidth}px" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, Arial, sans-serif" font-size="11">`;
 
   groupBounds.forEach((gb, idx) => {
-    if (idx % 2 === 0) svg += `<rect x="0" y="${gb.top}" width="${chartWidth}" height="${gb.height}" fill="#f5f5f5"/>`;
+    if (idx % 2 === 0) svg += `<rect x="0" y="${gb.top}" width="${chartWidth}" height="${gb.height}" fill="#eceee9"/>`;
   });
   minor.forEach(t => {
     const x = scaleX(t);
-    svg += `<line x1="${x}" y1="${axisY - 3}" x2="${x}" y2="${axisY + 3}" stroke="#c9c9c9" stroke-width="1"/>`;
+    svg += `<line x1="${x}" y1="${axisY - 3}" x2="${x}" y2="${axisY + 3}" stroke="#c6c9c4" stroke-width="1"/>`;
   });
   major.forEach(t => {
     const x = scaleX(t);
-    svg += `<line x1="${x}" y1="${axisY}" x2="${x}" y2="${chartHeight - 8}" stroke="#dcdcdc" stroke-width="1"/>`;
-    svg += `<text x="${x}" y="${topMargin - 14}" text-anchor="middle" fill="#555">${fmtTick(t)}</text>`;
+    svg += `<line x1="${x}" y1="${axisY}" x2="${x}" y2="${chartHeight - 8}" stroke="#dcdfda" stroke-width="1"/>`;
+    svg += `<text x="${x}" y="${topMargin - 14}" text-anchor="middle" fill="#5b6266">${fmtTick(t)}</text>`;
   });
 
   lensData.forEach((ld, idx) => {
@@ -904,7 +1048,7 @@ function renderChart({ gap, reference, lensData }) {
     // Reserve the space up to the marker line for the name; truncated with an
     // ellipsis after render if it doesn't fit (measured, not guessed).
     const nameMaxWidth = Math.max(30, mx - 12);
-    svg += `<text class="lensname" data-full="${escapeAttr(ld.lens.name)}" data-maxw="${nameMaxWidth}" x="6" y="${gb.top + 14}" fill="#111" font-weight="bold"><title>${escapeText(ld.lens.name)}</title>${escapeText(ld.lens.name)}</text>`;
+    svg += `<text class="lensname" data-full="${escapeAttr(ld.lens.name)}" data-maxw="${nameMaxWidth}" x="6" y="${gb.top + 14}" fill="#1b1d1e" font-weight="bold"><title>${escapeText(ld.lens.name)}</title>${escapeText(ld.lens.name)}</text>`;
     svg += `<line x1="${mx}" y1="${gb.top + 2}" x2="${mx}" y2="${gb.top + headerHeight - 2}" stroke="#1a7a4c" stroke-width="2.5"/>`;
     // Value of the close-focus marker, so the reference point is readable without
     // cross-checking the lens table. Flips to the left of the line near the edge.
@@ -915,13 +1059,13 @@ function renderChart({ gap, reference, lensData }) {
 
     ld.rows.forEach((r, ri) => {
       const rowY = gb.top + headerHeight + ri * rowHeight + rowHeight / 2;
-      svg += `<text x="6" y="${rowY + 4}" fill="#222">${r.label}</text>`;
+      svg += `<text x="6" y="${rowY + 4}" fill="#1b1d1e">${r.label}</text>`;
       if (!r.valid) {
         svg += `<text x="${leftMargin}" y="${rowY + 4}" fill="#a3273a" font-style="italic">${r.invalidReason}</text>`;
         return;
       }
       const x1 = scaleX(r.near), x2 = scaleX(r.far);
-      const barColor = r.d < 0 ? '#5b7aa3' : '#a3273a';
+      const barColor = r.d < 0 ? '#4c6b8a' : '#a3273a';
       const barWidth = Math.abs(x2 - x1);
       const rangeLabel = fmt(Math.abs(r.far - r.near));
 
@@ -929,8 +1073,8 @@ function renderChart({ gap, reference, lensData }) {
       // Inside-bar range label; a post-render getBBox pass moves it into brackets
       // after the far value if it doesn't actually fit inside the bar.
       svg += `<text class="rangeIn" data-bw="${barWidth}" data-far="far-${idx}-${ri}" x="${(x1 + x2) / 2}" y="${rowY + 3}" text-anchor="middle" fill="#fff" font-size="9" font-weight="bold">${rangeLabel}</text>`;
-      svg += `<text x="${Math.min(x1, x2) - 4}" y="${rowY + 4}" text-anchor="end" fill="#222" font-size="10">${fmt(r.near)}</text>`;
-      svg += `<text id="far-${idx}-${ri}" x="${Math.max(x1, x2) + 4}" y="${rowY + 4}" text-anchor="start" fill="#222" font-size="10">${fmt(r.far)}</text>`;
+      svg += `<text x="${Math.min(x1, x2) - 4}" y="${rowY + 4}" text-anchor="end" fill="#1b1d1e" font-size="10">${fmt(r.near)}</text>`;
+      svg += `<text id="far-${idx}-${ri}" x="${Math.max(x1, x2) + 4}" y="${rowY + 4}" text-anchor="start" fill="#1b1d1e" font-size="10">${fmt(r.far)}</text>`;
     });
   });
 
@@ -1185,6 +1329,21 @@ function downloadCSVTemplate() {
     ['35mm Master Prime', "2' 6\"", '0.2m', 'PL'].map(csvField).join(','),
     ['50mm Signature Prime', '18"', '0.19m', 'LPL'].map(csvField).join(',')
   ]);
+}
+
+/* Export the current lens table as a CSV someone else can load with Import CSV.
+   Writes back the exact strings the user typed (not computed/rounded values),
+   so a round-trip export -> import reproduces the set precisely. A custom
+   mount's flange distance is written directly in the Mount column, which
+   Import CSV already treats as a custom flange when it isn't PL/LPL/PV. */
+function exportLensesCSV() {
+  if (state.lenses.length === 0) { alert('Add a lens first.'); return; }
+  const lines = [['Lens name', 'Close focus', 'Lens Length', 'Mount'].map(csvField).join(',')];
+  state.lenses.forEach(l => {
+    const mountOut = l.mount === 'custom' ? (l.mountCustom || '') : (l.mount || '');
+    lines.push([l.name || '', l.cf || '', l.lensLen || '', mountOut].map(csvField).join(','));
+  });
+  downloadCSV('lens-set-export.csv', lines);
 }
 
 function exportResultsCSV() {
