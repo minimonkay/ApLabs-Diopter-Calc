@@ -215,11 +215,12 @@ try {
 
   /* ---- explorer (drag playground) ---- */
   #explorer { scroll-margin-top: 12px; }
-  .scene-scroll { overflow-x: auto; }
+  .scene-scroll { overflow: visible; touch-action: none; }
   .scene {
-    display: block; width: 100%; min-width: 620px; max-width: 760px; height: auto;
+    display: block; width: 100%; max-width: 760px; height: auto;
     margin-top: 6px; padding: 10px 6px 4px;
     background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+    touch-action: none;
   }
   .scene .grab { cursor: ew-resize; touch-action: none; }
   .scene .grab-hit { fill: transparent; cursor: ew-resize; touch-action: none; }
@@ -290,7 +291,6 @@ try {
 <!-- ============ STEP 1 ============ -->
 <section>
   <div class="step-head"><span class="step-num">1</span><h2>Set up</h2></div>
-  <p class="lead">Pick your units, choose whether distances are measured from the film plane or the diopter, and enter the gap between the diopter and the front of the lens.</p>
 
   <div class="row">
     <div class="control">
@@ -382,7 +382,6 @@ try {
 <!-- ============ STEP 2 ============ -->
 <section>
   <div class="step-head"><span class="step-num">2</span><h2>Your diopters</h2></div>
-  <p class="lead">List the diopters you're carrying. Add the strength of each one; glass thickness is optional — it will affect the answers by half of the diopter's thickness, so not a major change.</p>
 
   <div class="table-scroll">
   <table id="diopterTable">
@@ -461,7 +460,6 @@ try {
 <!-- ============ RESULTS ============ -->
 <section>
   <div class="step-head"><span class="step-num">✓</span><h2>Results</h2></div>
-  <p class="lead">Your focus limits for every lens and diopter combination. Print the graph, save it as an image, or export the CSV table.</p>
 
   <div id="printArea">
     <div class="toolbar no-print">
@@ -528,9 +526,9 @@ try {
     <line id="mountBar" x1="82" y1="98" x2="82" y2="122" stroke="var(--ink)" stroke-width="4"/>
     <text id="mountLabel" x="82" y="84" text-anchor="middle" font-size="9.5" fill="var(--ink)">Lens mount</text>
     <line id="frontEdge" class="grab" x1="0" y1="86" x2="0" y2="134" stroke="var(--amber-deep)" stroke-width="4" stroke-linecap="round"/>
-    <rect id="frontHit" class="grab-hit" x="0" y="80" width="20" height="60"/>
+    <rect id="frontHit" class="grab-hit" x="0" y="76" width="24" height="68"/>
     <ellipse id="diopterGlass" class="grab" cx="0" cy="110" rx="7" ry="27" fill="var(--amber-soft)" stroke="var(--amber-deep)" stroke-width="1.3"/>
-    <rect id="diopterHit" class="grab-hit" x="0" y="80" width="26" height="60"/>
+    <rect id="diopterHit" class="grab-hit" x="0" y="76" width="28" height="68"/>
     <text id="dioTag" x="0" y="156" text-anchor="middle" font-size="9.5" fill="var(--ink)">Diopter &#8596;</text>
     <g id="dimLen" stroke="var(--steel)">
       <line id="dimLenA" x1="0" y1="172" x2="0" y2="172" stroke-width="1"/>
@@ -552,7 +550,7 @@ try {
     <text id="farLabel" x="0" y="96" text-anchor="middle" font-size="10" fill="var(--ink)"></text>
     <text id="bandNote" x="500" y="145" text-anchor="middle" font-size="10" fill="var(--steel)" font-style="italic"></text>
     <line id="cfMark" class="grab" x1="0" y1="88" x2="0" y2="132" stroke="var(--focus-green)" stroke-width="2.5"/>
-    <rect id="cfHit" class="grab-hit" x="0" y="80" width="18" height="60"/>
+    <rect id="cfHit" class="grab-hit" x="0" y="76" width="22" height="68"/>
     <text id="cfLabel" x="0" y="76" text-anchor="middle" font-size="9.5" fill="var(--focus-green)" font-weight="600">CF &#8596;</text>
   </svg>
   </div>
@@ -618,7 +616,7 @@ try {
 <script>
 'use strict';
 // [pure-core-start]
-const APP_VERSION = 'v22'; // bump this on every revision — shown under the title
+const APP_VERSION = 'v23'; // bump this on every revision — shown under the title
 const M_PER_FT = 0.3048;
 
 /* Flange focal depth by mount type — the fixed distance from the mount's contact
@@ -1986,9 +1984,9 @@ function updateExplorer() {
   el('flangeLabel').setAttribute('x', (X0 + mountX) / 2);
   el('lensBody').setAttribute('d', `M ${mountX},${EX_CY - 12} L ${frontX},${EX_CY - 24} L ${frontX},${EX_CY + 24} L ${mountX},${EX_CY + 12} Z`);
   el('frontEdge').setAttribute('x1', frontX); el('frontEdge').setAttribute('x2', frontX);
-  el('frontHit').setAttribute('x', frontX - 10);
+  el('frontHit').setAttribute('x', frontX - 12);
   el('diopterGlass').setAttribute('cx', dioCX); el('diopterGlass').setAttribute('rx', rx);
-  el('diopterHit').setAttribute('x', dioCX - 13);
+  el('diopterHit').setAttribute('x', dioCX - 14);
   el('dioTag').setAttribute('x', dioCX);
 
   el('dimLenA').setAttribute('x1', mountX); el('dimLenA').setAttribute('x2', frontX);
@@ -2006,7 +2004,7 @@ function updateExplorer() {
   /* CF marker + live value */
   const cfX = xFromDist(exState.cf);
   el('cfMark').setAttribute('x1', cfX); el('cfMark').setAttribute('x2', cfX);
-  el('cfHit').setAttribute('x', cfX - 9);
+  el('cfHit').setAttribute('x', cfX - 11);
   el('cfLabel').setAttribute('x', cfX);
   el('cfLabel').textContent = cfLabelText();
 
@@ -2105,15 +2103,36 @@ function bindExplorer() {
      rendered width (guarded for environments with no layout). While
      dragging, close focus snaps to whole inches (ft) or whole cm (metric). */
   const svg = el('scene');
+  const sceneScroll = svg.closest('.scene-scroll');
   let drag = null; // { kind, startClientX, startVal }
   const viewScale = () => {
     const w = svg.getBoundingClientRect().width;
     return w > 0 ? 760 / w : 1;
   };
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const lockTouch = () => {
+    document.body.style.touchAction = 'none';
+    document.documentElement.style.overscrollBehavior = 'none';
+    if (sceneScroll) sceneScroll.style.touchAction = 'none';
+  };
+  const unlockTouch = () => {
+    document.body.style.touchAction = '';
+    document.documentElement.style.overscrollBehavior = '';
+    if (sceneScroll) sceneScroll.style.touchAction = '';
+  };
   const start = (kind, getVal) => e => {
     drag = { kind, startClientX: e.clientX, startVal: getVal() };
-    if (e.pointerId !== undefined && svg.setPointerCapture) { try { svg.setPointerCapture(e.pointerId); } catch (err) {} }
+    // Capture on the HTML wrapper rather than an SVG child — SVG pointer
+    // capture support is inconsistent on some mobile browsers, and if it
+    // silently fails there, the touch gets re-hit-tested against whatever
+    // the finger drifts onto next (easy once the handle itself is small),
+    // letting the browser reclaim the gesture as a scroll/navigation swipe.
+    // Locking touch-action on the whole page for the drag's short duration
+    // removes that possibility entirely, regardless of where the finger ends
+    // up or whether capture is honoured.
+    const captureTarget = sceneScroll || e.target;
+    if (e.pointerId !== undefined && captureTarget.setPointerCapture) { try { captureTarget.setPointerCapture(e.pointerId); } catch (err) {} }
+    lockTouch();
     e.preventDefault();
   };
   const onMove = e => {
@@ -2130,7 +2149,7 @@ function bindExplorer() {
     syncExplorerSliders(); updateExplorer();
     e.preventDefault();
   };
-  const onUp = () => { drag = null; };
+  const onUp = () => { drag = null; unlockTouch(); };
   [['lensBody', 'front'], ['frontEdge', 'front'], ['frontHit', 'front'], ['diopterGlass', 'diopter'], ['diopterHit', 'diopter'], ['cfMark', 'cf'], ['cfHit', 'cf']]
     .forEach(([id, kind]) => {
       const getVal = kind === 'front' ? () => exState.lensLen : kind === 'diopter' ? () => exState.gap : () => exState.cf;
