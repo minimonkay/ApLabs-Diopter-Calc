@@ -1,39 +1,69 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Aperture Laboratories&#39; Diopter Calc</title>
+<script>
+/* Runs before first paint so a saved light theme doesn't flash dark.
+   The main script at the bottom owns everything else. */
+try {
+  var _s = JSON.parse(localStorage.getItem('diopterCalc.state'));
+  if (_s && _s.theme === 'light') document.documentElement.removeAttribute('data-theme');
+} catch (e) {}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   /* ---- design tokens ----
      Palette reads as measuring instrument, not brand site: graphite text,
-     cool paper background, one warm amber accent (lens-coating gold) for
-     action and emphasis. Green/red/blue stay as-is — they're the chart's
-     already-learned meaning (CF marker / positive / negative diopter). */
+     one warm amber accent (lens-coating gold) for action and emphasis.
+     Green/red/blue stay as-is — they're the chart's already-learned meaning
+     (CF marker / positive / negative diopter).
+
+     :root holds the LIGHT theme — it's canonical: print and PNG export
+     always use it. [data-theme="dark"] (the default, set on <html>)
+     overrides every colour for screen use. */
   :root {
+    color-scheme: light;
     --ink: #1b1d1e;
+    --ink-soft: #3a3d3e;
     --steel: #5b6266;
     --paper: #f3f4f1;
     --surface: #ffffff;
     --line: #dcdfda;
+    --line-strong: #c6c9c4;
+    --bg-soft: #eceee9;
     --amber: #b8752e;
     --amber-deep: #8f5a20;
     --amber-soft: #f2e5d2;
     --focus-green: #1a7a4c;
     --warn-red: #a3273a;
+    --warn-soft: #f3dde1;
     --diopter-blue: #4c6b8a;
     --radius: 7px;
 
-    /* kept for backward compatibility with existing rules/selectors below */
-    --muted: var(--steel);
-    --accent: var(--warn-red);
-    --bg-soft: #eceee9;
-
     --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
     --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ink: #e6e4df;
+    --ink-soft: #c8cbc5;
+    --steel: #9aa0a3;
+    --paper: #17181a;
+    --surface: #212326;
+    --line: #33363a;
+    --line-strong: #474b50;
+    --bg-soft: #26292c;
+    --amber: #d1994f;
+    --amber-deep: #d08a45;
+    --amber-soft: #3a2e1f;
+    --focus-green: #43a374;
+    --warn-red: #b6505f;
+    --warn-soft: #46242c;
+    --diopter-blue: #5c83a8;
   }
 
   * { box-sizing: border-box; }
@@ -57,14 +87,14 @@
     font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center;
   }
   h2 { font-family: var(--font-sans); font-weight: 600; font-size: 18px; margin: 0; letter-spacing: -0.005em; }
-  .lead { font-size: 14px; margin: 0 0 14px 37px; color: #3a3d3e; }
+  .lead { font-size: 14px; margin: 0 0 14px 37px; color: var(--ink-soft); }
 
   /* ---- collapsible detail ---- */
   details { margin-top: 10px; border-left: 3px solid var(--line); padding-left: 12px; }
   summary { cursor: pointer; font-size: 13px; color: var(--steel); user-select: none; padding: 3px 0; transition: color .12s ease; }
   summary:hover { color: var(--amber-deep); }
   details[open] summary { margin-bottom: 6px; color: var(--ink); }
-  details .body { font-size: 13px; color: #3f4243; }
+  details .body { font-size: 13px; color: var(--ink-soft); }
   details .body p { margin: 6px 0; }
   details code {
     background: var(--amber-soft); color: var(--amber-deep); font-family: var(--font-mono);
@@ -83,32 +113,32 @@
   input[type=radio] { accent-color: var(--amber-deep); }
 
   input[type=text] {
-    padding: 6px 9px; border: 1px solid #c6c9c4; border-radius: var(--radius);
+    padding: 6px 9px; border: 1px solid var(--line-strong); border-radius: var(--radius);
     font-size: 13px; font-family: var(--font-sans); background: var(--surface); color: var(--ink);
     transition: border-color .12s ease, box-shadow .12s ease;
   }
   input[type=text]:focus { outline: none; border-color: var(--amber); box-shadow: 0 0 0 3px var(--amber-soft); }
   input.narrow { width: 140px; }
-  input.bad { border-color: var(--warn-red) !important; box-shadow: 0 0 0 3px #f3dde1 !important; }
+  input.bad { border-color: var(--warn-red) !important; box-shadow: 0 0 0 3px var(--warn-soft) !important; }
   input.dist, input.num, #mountingGap {
     font-family: var(--font-mono); text-align: right; font-variant-numeric: tabular-nums;
   }
 
   select {
-    padding: 6px 8px; border: 1px solid #c6c9c4; border-radius: var(--radius);
+    padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: var(--radius);
     font-size: 13px; font-family: var(--font-sans); background: var(--surface); color: var(--ink);
   }
 
   button {
     padding: 7px 13px; cursor: pointer; font-size: 13px; font-family: var(--font-sans); font-weight: 500;
-    border: 1px solid #c6c9c4; background: var(--surface); color: var(--ink); border-radius: var(--radius);
+    border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); border-radius: var(--radius);
     transition: background .12s ease, border-color .12s ease, transform .05s ease;
   }
-  button:hover:not(:disabled) { background: var(--paper); border-color: #b7bab4; }
+  button:hover:not(:disabled) { background: var(--paper); border-color: var(--steel); }
   button:active:not(:disabled) { transform: translateY(1px); }
   button:disabled { cursor: default; opacity: 0.45; }
-  button.primary { background: var(--amber-deep); color: #fff; border-color: var(--amber-deep); }
-  button.primary:hover:not(:disabled) { background: #764a1a; border-color: #764a1a; }
+  button.primary { background: var(--amber-deep); color: var(--surface); border-color: var(--amber-deep); }
+  button.primary:hover:not(:disabled) { filter: brightness(0.92); }
 
   :focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 
@@ -119,8 +149,8 @@
     background: var(--bg-soft); font-family: var(--font-mono); font-size: 11px;
     font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: var(--steel);
   }
-  th .sub { display: block; font-weight: 400; text-transform: none; letter-spacing: normal; color: #8a8f89; font-size: 11px; font-family: var(--font-sans); margin-top: 2px; }
-  .add-row td { border-top: 2px solid #c6c9c4; background: var(--paper); }
+  th .sub { display: block; font-weight: 400; text-transform: none; letter-spacing: normal; color: var(--steel); font-size: 11px; font-family: var(--font-sans); margin-top: 2px; }
+  .add-row td { border-top: 2px solid var(--line-strong); background: var(--paper); }
   #resultsTable tr.lens-even td { background: var(--bg-soft); }
   #resultsTable tr.lens-odd td { background: var(--surface); }
   /* Numeric result columns: right-aligned tabular mono reads down a column
@@ -129,11 +159,39 @@
   #resultsTable td:nth-child(n+2) { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
   #resultsTable td:first-child, #resultsTable th:first-child { text-align: left; }
 
+  /* Row actions are real <button>s (keyboard + screen-reader access),
+     restyled to stay as quiet as plain text links. */
+  button.rm, button.mv { border: none; background: none; padding: 2px 4px; border-radius: 4px; }
+  button.rm:hover:not(:disabled), button.mv:hover:not(:disabled) { background: var(--bg-soft); border-color: transparent; }
   .rm { color: var(--warn-red); cursor: pointer; font-size: 12px; margin-left: 6px; }
   .mv { color: var(--steel); cursor: pointer; font-size: 13px; margin-right: 5px; user-select: none; }
   .mv:hover { color: var(--ink); }
+
+  /* Phones: wide tables and the chart scroll sideways inside their own
+     container instead of stretching the whole page. The chart keeps a
+     minimum width so its labels stay legible. */
+  .table-scroll { overflow-x: auto; }
+  #allLensesChartContainer { overflow-x: auto; }
+  #allLensesChartContainer svg { min-width: 600px; }
   .note { font-size: 12px; color: var(--steel); }
-  .invalid { color: var(--warn-red); font-style: italic; }
+  /* invalid rows are 'not applicable', not danger — steel keeps them
+     distinct from the red positive-diopter bars */
+  .invalid { color: var(--steel); font-style: italic; }
+
+  .titlebar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 8px 14px; }
+
+  /* ---- inline notices & confirms (no alert/prompt/confirm) ---- */
+  .inline-panel {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    margin: 8px 0; padding: 9px 12px; font-size: 13px;
+    background: var(--surface); border: 1px solid var(--line-strong);
+    border-left: 3px solid var(--amber); border-radius: var(--radius);
+  }
+  .inline-panel[hidden] { display: none; }
+  .inline-panel.warn { border-left-color: var(--warn-red); }
+  .inline-panel.ok { border-left-color: var(--focus-green); }
+  .inline-panel .spacer { flex: 1 1 auto; }
+  .inline-note { font-size: 12px; color: var(--warn-red); font-style: italic; }
 
   /* ---- toolbars ---- */
   .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
@@ -155,10 +213,22 @@
   a { color: var(--amber-deep); }
 
   @media print {
+    /* Print is always light — mirror the :root (light) tokens above. */
+    :root[data-theme="dark"] {
+      color-scheme: light;
+      --ink: #1b1d1e; --ink-soft: #3a3d3e; --steel: #5b6266;
+      --paper: #f3f4f1; --surface: #ffffff; --line: #dcdfda; --line-strong: #c6c9c4;
+      --bg-soft: #eceee9;
+      --amber: #b8752e; --amber-deep: #8f5a20; --amber-soft: #f2e5d2;
+      --focus-green: #1a7a4c; --warn-red: #a3273a; --warn-soft: #f3dde1;
+      --diopter-blue: #4c6b8a;
+    }
     body * { visibility: hidden; }
     #printArea, #printArea * { visibility: visible; }
     #printArea { position: absolute; top: 0; left: 0; width: 100%; }
     .no-print { display: none !important; }
+    #allLensesChartContainer { overflow: visible; }
+    #allLensesChartContainer svg { min-width: 0; }
   }
   @media (max-width: 620px) {
     .row { gap: 14px; }
@@ -171,7 +241,10 @@
 </head>
 <body>
 
-<h1>Aperture Laboratories&rsquo; Diopter Calc <span class="note" id="versionNote" style="font-weight:400"></span></h1>
+<div class="titlebar">
+  <h1>Aperture Laboratories&rsquo; Diopter Calc <span class="note" id="versionNote" style="font-weight:400"></span></h1>
+  <button id="btnTheme" class="no-print">Light mode</button>
+</div>
 <noscript>
   <p style="background:#fdecea;border:1px solid #e0a9a3;border-radius:6px;padding:12px 14px;
             font-size:14px;color:#7a2018;margin:0 0 20px">
@@ -194,24 +267,24 @@
   <div class="row">
     <div class="control">
       <div class="label">Units</div>
-      <label class="opt"><input type="radio" name="unit" value="ft" checked onchange="setUnit(this.value)"> Feet / inches</label>
-      <label class="opt"><input type="radio" name="unit" value="m" onchange="setUnit(this.value)"> Meters</label>
+      <label class="opt"><input type="radio" name="unit" value="ft" checked> Feet / inches</label>
+      <label class="opt"><input type="radio" name="unit" value="m"> Meters</label>
       <div class="note" id="unitDefaultNote" style="margin-top:5px"></div>
     </div>
 
     <div class="control">
       <div class="label">Measure distances from</div>
-      <label class="opt"><input type="radio" name="reference" value="filmplane" checked onchange="setReference(this.value)"> Film plane</label>
-      <label class="opt"><input type="radio" name="reference" value="diopter" onchange="setReference(this.value)"> The diopter</label>
+      <label class="opt"><input type="radio" name="reference" value="filmplane" checked> Film plane</label>
+      <label class="opt"><input type="radio" name="reference" value="diopter"> The diopter</label>
     </div>
 
     <div class="control">
       <div class="label">Mounting gap</div>
-      <input type="text" class="narrow" id="mountingGap" placeholder="e.g. 1&quot; or 3mm" oninput="onDistanceInput(this)">
+      <input type="text" class="narrow" id="mountingGap" placeholder="e.g. 1&quot; or 3mm">
     </div>
   </div>
 
-  <svg class="gap-diagram" viewBox="0 0 440 150" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing lens mount, front of lens, lens length, flange depth, mounting gap, subject distance, and the diopter">
+  <svg class="gap-diagram" viewBox="0 0 440 150" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagram showing lens mount, front of lens, lens length, flange depth, mounting gap, diopter-to-subject distance, and the diopter">
     <!-- camera body, extending all the way to the mount -->
     <rect x="6" y="50" width="66" height="40" rx="2" fill="var(--bg-soft)" stroke="var(--ink)" stroke-width="1.2"/>
 
@@ -265,9 +338,8 @@
     <line x1="215" y1="128" x2="330" y2="128" stroke="var(--steel)" stroke-width="1"/>
     <line x1="215" y1="123" x2="215" y2="133" stroke="var(--steel)" stroke-width="1"/>
     <line x1="330" y1="123" x2="330" y2="133" stroke="var(--steel)" stroke-width="1"/>
-    <text x="272" y="145" text-anchor="middle" font-size="9" fill="var(--steel)">Subject distance (SD)</text>
+    <text x="274" y="145" text-anchor="middle" font-size="8.5" fill="var(--steel)">Diopter to subject (DS)</text>
   </svg>
-  <p class="note" style="margin:2px 0 14px">Not the front glass element — lens length and the gap are both measured to the mounting points, not the optics. This gap applies to every lens. Subject distance (SD) is the same term used in the worked example at the bottom of the page.</p>
 
   <details>
     <summary>More about these settings</summary>
@@ -284,6 +356,7 @@
   <div class="step-head"><span class="step-num">2</span><h2>Your diopters</h2></div>
   <p class="lead">List the diopters you're carrying. Add the strength of each one; glass thickness is optional — it will affect the answers by half of the diopter's thickness, so not a major change.</p>
 
+  <div class="table-scroll">
   <table id="diopterTable">
     <thead>
       <tr>
@@ -294,12 +367,14 @@
     </thead>
     <tbody></tbody>
     <tfoot>
-      <tr class="add-row"><td colspan="3"><button onclick="addDiopter()">+ Add diopter</button></td></tr>
+      <tr class="add-row"><td colspan="3"><button id="btnAddDiopter">+ Add diopter</button></td></tr>
     </tfoot>
   </table>
+  </div>
+  <p class="inline-note" id="diopterNote" hidden style="margin:4px 0 0"></p>
 
   <details>
-    <summary>Why thickness matters</summary>
+    <summary>Why diopter thickness matters</summary>
     <div class="body">
       <p>The maths references the <b>optical centre</b> of the diopter, but the mounting gap is measured to its <b>front face</b>. Giving a thickness lets the app add half of it to bridge that difference, so a thick +3 is handled differently from a thin +1/2.</p>
       <p>The effect is small — half the glass thickness, so around 7mm for a 15mm diopter — and it shifts near and far limits by the same amount. Leave thickness blank and no correction is applied.</p>
@@ -311,20 +386,22 @@
 <!-- ============ STEP 3 ============ -->
 <section>
   <div class="step-head"><span class="step-num">3</span><h2>Your lenses</h2></div>
-  <p class="lead">Add each lens with its close focus and length. Load a saved set or import a CSV to skip the typing.</p>
+  <p class="lead">Add each lens with its close focus and length. Load a saved set or import a CSV.</p>
 
   <div class="toolbar">
     <select id="setSelect"></select>
-    <button id="btnLoadSet" onclick="loadSelectedSet()">Load set</button>
-    <button id="btnSaveSet" onclick="saveCurrentSet()">Save set…</button>
-    <button id="btnDeleteSet" onclick="deleteSelectedSet()">Delete</button>
+    <button id="btnLoadSet">Load set</button>
+    <button id="btnSaveSet">Save set…</button>
+    <button id="btnDeleteSet">Delete</button>
     <span class="spacer"></span>
-    <label class="note" style="margin:0">Import CSV <input type="file" accept=".csv" id="csvImport" onchange="handleCSVImport(this.files[0])"></label>
-    <button onclick="downloadCSVTemplate()">Template</button>
-    <button onclick="exportLensesCSV()">Export lenses</button>
+    <button id="btnCSVTemplate">CSV template</button>
+    <label class="note" style="margin:0">Import CSV <input type="file" accept=".csv" id="csvImport"></label>
+    <button id="btnExportLenses">Export CSV</button>
   </div>
-  <p class="note" id="storageNote" style="margin:0 0 4px">Saved sets are stored in this browser only. Export lenses to send your current set to someone else — they can load it with Import CSV.</p>
+  <p class="note" id="storageNote" style="margin:0 0 4px">Saved sets are stored in this browser only. Export CSV to send your current set to someone else — they can load it with Import CSV.</p>
+  <div class="inline-panel no-print" id="setPanel" hidden></div>
 
+  <div class="table-scroll">
   <table id="lensTable">
     <thead>
       <tr>
@@ -337,16 +414,16 @@
     </thead>
     <tbody></tbody>
     <tfoot>
-      <tr class="add-row"><td colspan="5"><button onclick="addLens()">+ Add lens</button></td></tr>
+      <tr class="add-row"><td colspan="5"><button id="btnAddLens">+ Add lens</button></td></tr>
     </tfoot>
   </table>
+  </div>
 
   <details>
     <summary>How to measure each field</summary>
     <div class="body">
       <p><b>Close focus</b> is the lens's close focus without any diopter fitted.</p>
-      <p><b>Lens length</b> runs from the front of the lens to the mount. Manufacturers usually publish this figure directly. The <b>Mount</b> you pick then adds its flange depth to reach the film plane: PL 52mm, LPL 44mm, PV 57.15mm, or set your own with Custom.</p>
-      <p>Lens length and mount are only needed when measuring from the film plane.</p>
+      <p><b>Lens length</b> runs from the front of the lens to the lens mount. The <b>Mount</b> you pick then adds its flange depth to reach the film plane: PL 52mm, LPL 44mm, PV 57.15mm, or set your own with Custom.</p>
       <p><b>Tip:</b> if the numbers don't match reality, measure straight from the front of the lens to the ϕ mark on the camera. That total should equal your lens length plus the mount's flange depth.</p>
       <p><b>CSV import</b> needs columns whose headers contain <code>name</code>, <code>close</code>, and <code>length</code>, in any order; an optional <code>mount</code> column is read too. Download the template for the exact shape. Imported lenses are added to the table, not replacing what's there.</p>
     </div>
@@ -356,27 +433,31 @@
 <!-- ============ RESULTS ============ -->
 <section>
   <div class="step-head"><span class="step-num">✓</span><h2>Results</h2></div>
-  <p class="lead">Your focus limits for every lens and diopter combination. Print the chart, save it as an image, or export the numbers.</p>
+  <p class="lead">Your focus limits for every lens and diopter combination. Print the graph, save it as an image, or export the CSV table.</p>
 
   <div id="printArea">
     <div class="toolbar no-print">
-      <button class="primary" onclick="window.print()">Print chart</button>
-      <button onclick="downloadChartPNG()">Download PNG</button>
-      <button onclick="exportResultsCSV()">Export CSV</button>
+      <button class="primary" id="btnPrint">Print graph</button>
+      <button id="btnDownloadPNG">Download PNG</button>
+      <button id="btnExportResults">Export table</button>
+      <span class="inline-note" id="chartNote" hidden></span>
     </div>
     <div id="allLensesChartContainer"></div>
   </div>
 
+  <div class="table-scroll">
   <table id="resultsTable">
     <thead><tr><th>Lens</th><th>Diopter</th><th>Near limit</th><th>Far limit</th><th>Range</th></tr></thead>
     <tbody></tbody>
   </table>
+  </div>
 
   <details>
-    <summary>Reading the chart</summary>
+    <summary>Reading the graph</summary>
     <div class="body">
       <p>Each bar runs from the near limit to the far limit for one diopter, with the total depth of that range shown inside it. All lenses share one distance scale so you can compare them directly.</p>
       <p>The <b>green line</b> on each lens row marks that lens's own close focus with no diopter fitted, labelled with its value — so you can see at a glance how much extra reach each diopter buys you.</p>
+      <p><b>Blue bars</b> are negative diopters. They're open-ended, with an arrow at the right edge, because a negative diopter's far limit is infinity — it shifts the whole focus range outward.</p>
     </div>
   </details>
 </section>
@@ -388,8 +469,8 @@
     <div class="body">
       <div class="breakdown">
         <div id="breakdownControls" style="margin-bottom:8px">
-          <label>Show the maths for <select id="breakdownLens" onchange="renderOutputs()"></select></label>
-          <label>with <select id="breakdownDiopter" onchange="renderOutputs()"></select></label>
+          <label>Show the maths for <select id="breakdownLens"></select></label>
+          <label>with <select id="breakdownDiopter"></select></label>
         </div>
         <div id="gapBreakdown"></div>
       </div>
@@ -400,7 +481,7 @@
 <script>
 'use strict';
 // [pure-core-start]
-const APP_VERSION = 'v9'; // bump this on every revision — shown under the title
+const APP_VERSION = 'v15'; // bump this on every revision — shown under the title
 const M_PER_FT = 0.3048;
 
 /* Flange focal depth by mount type — the fixed distance from the mount's contact
@@ -417,6 +498,7 @@ function flangeDepth(lens) {
 }
 
 const state = {
+  theme: 'dark',           // 'dark' (default) | 'light' — screen only; print/export stay light
   unit: 'ft',              // 'ft' | 'm'  — display/output unit
   reference: 'filmplane',  // 'diopter' | 'filmplane'
   diopters: [                // {id, power, thickness} — thickness is raw typed string
@@ -469,6 +551,7 @@ function parseDistance(raw) {
 
 /* ---------- formatting ---------- */
 function fmtUnit(m, unit) {
+  if (m === Infinity) return '∞'; // negative diopters: far limit is infinity
   if (m === null || m === undefined || isNaN(m) || !isFinite(m)) return '—';
   if (unit === 'ft') {
     const sign = m < 0 ? '-' : '';
@@ -488,6 +571,7 @@ function fmtAlt(m) { return state.unit === 'ft' ? fmtMetric(m) : fmtUnit(m, 'ft'
 /* Always-mm formatter, independent of the app's ft/m display setting.
    Rounds to one decimal place; the decimal is dropped only when it's .0 */
 function fmtMetric(m) {
+  if (m === Infinity) return '∞';
   if (m === null || m === undefined || isNaN(m) || !isFinite(m)) return '—';
   const mm = Math.round(m * 1000 * 10) / 10;
   return `${Number.isInteger(mm) ? mm : mm.toFixed(1)}mm`;
@@ -554,11 +638,24 @@ function computeLensData(lens, gap, reference) {
     const sub = baseSub + halfThk;           // film plane to diopter centre
     const addBack = reference === 'filmplane' ? sub : 0;
     const effCF = cf - sub;
-    const far = 1 / d + addBack;
-    let near = null;
-    if (effCF > 0) near = effCF / (1 + d * effCF) + addBack;
-    const valid = near !== null && near > 0 && isFinite(far) && far > 0;
-    return { d, label: diopterLabel(d), near, far, valid, invalidReason: valid ? null : 'out of range', thickness, halfThk, sub };
+    /* Positive D: near = effCF/(1 + D·effCF), far = 1/D (lens at infinity).
+       Negative D shifts the whole range outward: the combo reaches infinity
+       focus while the lens is set to −1/D, so the far limit IS infinity —
+       provided that setting is within the lens's travel, i.e. the near-limit
+       denominator (1 + D·effCF) is still positive. If it isn't, the diopter
+       is too strong for this lens and nothing real is in focus. */
+    let near = null, far = null, invalidReason = null;
+    if (effCF <= 0) {
+      invalidReason = 'close focus sits inside the diopter';
+    } else {
+      const denom = 1 + d * effCF;
+      if (denom > 0) near = effCF / denom + addBack;
+      else invalidReason = 'diopter too strong for this lens'; // only reachable when d < 0
+      far = d > 0 ? 1 / d + addBack : Infinity;
+    }
+    const valid = near !== null && near > 0 && far !== null && far > 0;
+    if (!valid && !invalidReason) invalidReason = 'out of range';
+    return { d, label: diopterLabel(d), near, far, valid, invalidReason: valid ? null : invalidReason, thickness, halfThk, sub };
   });
 
   return {
@@ -599,36 +696,32 @@ function niceMeterStep(raw) {
   if (residual <= 5) return 5 * magnitude;
   return 10 * magnitude;
 }
+/* Shared tick walk: majors on the major step, minors on the minor step
+   wherever a major doesn't already sit (within eps). */
+function ticksInRange(min, max, majorStep, minorStep, eps) {
+  const major = [];
+  for (let v = Math.ceil(min / majorStep) * majorStep; v <= max + eps; v += majorStep) major.push(v);
+  const minor = [];
+  if (minorStep < majorStep) {
+    for (let v = Math.ceil(min / minorStep) * minorStep; v <= max + eps; v += minorStep) {
+      if (!major.some(mj => Math.abs(mj - v) < eps)) minor.push(v);
+    }
+  }
+  return { major, minor };
+}
 function buildTicks(domainMin, domainMax, tickCount) {
   if (state.unit === 'ft') {
     const toIn = m => (m / M_PER_FT) * 12;
     const fromIn = i => (i / 12) * M_PER_FT;
     const minIn = toIn(domainMin), maxIn = toIn(domainMax);
     const majorStep = niceStepFrom(FOOT_STEPS_IN, (maxIn - minIn) / tickCount || 1);
-    let minorStep = niceStepFrom(INCH_STEPS_IN, majorStep / 4 || 1);
-    if (minorStep >= majorStep) minorStep = majorStep;
-    const major = [];
-    for (let v = Math.ceil(minIn / majorStep) * majorStep; v <= maxIn + 1e-6; v += majorStep) major.push(v);
-    const minor = [];
-    if (minorStep < majorStep) {
-      for (let v = Math.ceil(minIn / minorStep) * minorStep; v <= maxIn + 1e-6; v += minorStep) {
-        if (!major.some(mj => Math.abs(mj - v) < 1e-6)) minor.push(v);
-      }
-    }
-    return { major: major.map(fromIn), minor: minor.map(fromIn) };
+    const minorStep = Math.min(majorStep, niceStepFrom(INCH_STEPS_IN, majorStep / 4 || 1));
+    const t = ticksInRange(minIn, maxIn, majorStep, minorStep, 1e-6);
+    return { major: t.major.map(fromIn), minor: t.minor.map(fromIn) };
   }
   const majorStep = niceMeterStep((domainMax - domainMin) / tickCount || 1);
-  let minorStep = niceMeterStep(majorStep / 4 || 1);
-  if (minorStep >= majorStep) minorStep = majorStep;
-  const major = [];
-  for (let v = Math.ceil(domainMin / majorStep) * majorStep; v <= domainMax + 1e-9; v += majorStep) major.push(v);
-  const minor = [];
-  if (minorStep < majorStep) {
-    for (let v = Math.ceil(domainMin / minorStep) * minorStep; v <= domainMax + 1e-9; v += minorStep) {
-      if (!major.some(mj => Math.abs(mj - v) < 1e-9)) minor.push(v);
-    }
-  }
-  return { major, minor };
+  const minorStep = Math.min(majorStep, niceMeterStep(majorStep / 4 || 1));
+  return ticksInRange(domainMin, domainMax, majorStep, minorStep, 1e-9);
 }
 
 /* ---------- escaping ---------- */
@@ -672,6 +765,67 @@ const el = id => document.getElementById(id);
 
 function setUnit(u) { state.unit = u; renderUnitDefaultNote(); renderOutputs(); refreshInputHints(); }
 function setReference(r) { state.reference = r; renderOutputs(); }
+
+/* ---------- theme ----------
+   Dark is the default (set on <html> in the markup, so no flash); light is
+   the opt-out. Screen only — print and PNG export always come out light. */
+function setTheme(t) {
+  state.theme = t === 'light' ? 'light' : 'dark';
+  if (state.theme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+  else document.documentElement.removeAttribute('data-theme');
+  el('btnTheme').textContent = state.theme === 'dark' ? 'Light mode' : 'Dark mode';
+  persistState();
+}
+
+/* ---------- working-state persistence ----------
+   The whole working state — theme, units, reference, mounting gap, diopters,
+   and the lens table — survives reopening the file. Distinct from named lens
+   sets (STORE_KEY): this is "where you left off", those are your library.
+   Raw typed strings are stored, so nothing is reformatted on restore. */
+const STATE_KEY = 'diopterCalc.state';
+function persistState() {
+  if (!storageOK) return;
+  try {
+    window.localStorage.setItem(STATE_KEY, JSON.stringify({
+      v: 1,
+      theme: state.theme,
+      unit: state.unit,
+      reference: state.reference,
+      gap: el('mountingGap').value,
+      diopters: state.diopters.map(dp => ({ power: dp.power, thickness: dp.thickness })),
+      lenses: state.lenses.map(l => ({ name: l.name, cf: l.cf, lensLen: l.lensLen, mount: l.mount || '', mountCustom: l.mountCustom || '' }))
+    }));
+  } catch (e) { /* storage full or blocked — keep working without persistence */ }
+}
+function loadPersistedState() {
+  if (!storageOK) return;
+  let s = null;
+  try { s = JSON.parse(window.localStorage.getItem(STATE_KEY)); } catch (e) { return; }
+  if (!s || typeof s !== 'object') return;
+  if (s.theme === 'light' || s.theme === 'dark') state.theme = s.theme;
+  if (s.unit === 'ft' || s.unit === 'm') state.unit = s.unit;
+  if (s.reference === 'filmplane' || s.reference === 'diopter') state.reference = s.reference;
+  if (typeof s.gap === 'string') el('mountingGap').value = s.gap;
+  if (Array.isArray(s.diopters)) {
+    state.diopters = s.diopters
+      .filter(dp => dp && typeof dp === 'object' && (dp.power === null || typeof dp.power === 'number'))
+      .map(dp => ({ id: state.nextDiopterId++, power: dp.power, thickness: typeof dp.thickness === 'string' ? dp.thickness : '' }));
+  }
+  if (Array.isArray(s.lenses)) {
+    state.lenses = s.lenses
+      .filter(l => l && typeof l === 'object')
+      .map(l => ({
+        id: state.nextId++,
+        name: String(l.name || ''), cf: String(l.cf || ''), lensLen: String(l.lensLen || ''),
+        mount: ['PL', 'LPL', 'PV', 'custom'].includes(l.mount) ? l.mount : '',
+        mountCustom: String(l.mountCustom || '')
+      }));
+  }
+  const u = document.querySelector(`input[name="unit"][value="${state.unit}"]`);
+  if (u) u.checked = true;
+  const rr = document.querySelector(`input[name="reference"][value="${state.reference}"]`);
+  if (rr) rr.checked = true;
+}
 function renderUnitDefaultNote() {
   const n = el('unitDefaultNote');
   if (n) n.textContent = state.unit === 'ft'
@@ -698,12 +852,10 @@ function refreshInputHints() {
    Strength is validated on blur so mid-typing "-" or duplicates don't wipe input. */
 function renderDiopterTable() {
   document.querySelector('#diopterTable tbody').innerHTML = state.diopters.map(dp => `
-    <tr>
-      <td><input type="text" class="narrow num" value="${dp.power === null || dp.power === undefined ? '' : escapeAttr(String(dp.power))}" placeholder="e.g. +1.5 or -0.5"
-            oninput="onDiopterPowerInput(${dp.id}, this)" onblur="onDiopterPowerBlur(${dp.id}, this)"></td>
-      <td><input type="text" class="narrow dist" value="${escapeAttr(dp.thickness || '')}" placeholder="e.g. 15mm (optional)"
-            oninput="onDiopterThicknessInput(${dp.id}, this)"></td>
-      <td><span class="rm" onclick="removeDiopter(${dp.id})">delete</span></td>
+    <tr data-id="${dp.id}">
+      <td><input type="text" class="narrow num" data-field="power" value="${dp.power === null || dp.power === undefined ? '' : escapeAttr(String(dp.power))}" placeholder="e.g. +1.5 or -0.5"></td>
+      <td><input type="text" class="narrow dist" data-field="thickness" value="${escapeAttr(dp.thickness || '')}" placeholder="e.g. 15mm (optional)"></td>
+      <td><button class="rm" data-act="rm">delete</button></td>
     </tr>`).join('');
   refreshInputHints();
 }
@@ -719,18 +871,26 @@ function onDiopterPowerInput(id, input) {
 function onDiopterPowerBlur(id, input) {
   const dp = state.diopters.find(x => x.id === id);
   if (!dp) return;
+  const note = el('diopterNote');
   const raw = input.value.trim();
-  if (raw === '') { dp.power = null; input.classList.remove('bad'); renderOutputs(); return; } // leave unfilled
+  if (raw === '') { dp.power = null; input.classList.remove('bad'); note.hidden = true; renderOutputs(); return; } // leave unfilled
   const val = parseFloat(input.value);
   if (isNaN(val) || val === 0) { input.value = dp.power === null ? '' : String(dp.power); input.classList.remove('bad'); return; }
   if (state.diopters.some(x => x.id !== id && x.power === val)) {
-    alert('That strength is already in your set.');
-    input.value = dp.power === null ? '' : String(dp.power);
-    input.classList.remove('bad');
+    // Keep what they typed (no silent revert): flag it and leave it out of
+    // the results until it's unique.
+    dp.power = null;
+    input.classList.add('bad');
+    input.title = 'Already in your set';
+    note.textContent = `${diopterLabel(val)} is already in your set — the duplicate is ignored until you change it.`;
+    note.hidden = false;
+    renderOutputs();
     return;
   }
   dp.power = val;
   input.classList.remove('bad');
+  input.title = '';
+  note.hidden = true;
   renderOutputs();
 }
 function onDiopterThicknessInput(id, input) {
@@ -789,19 +949,15 @@ function renderLensTable() {
       `<option value="${m}"${mount === m ? ' selected' : ''}>${m === 'custom' ? 'Custom…' : m}</option>`
     ).join('');
     const customField = mount === 'custom'
-      ? `<input type="text" class="dist" style="width:70px;margin-top:3px" value="${escapeAttr(l.mountCustom || '')}" placeholder="flange, e.g. 40mm as 0.04m"
-            oninput="onLensInput(${l.id}, 'mountCustom', this)">`
+      ? `<input type="text" class="dist" data-field="mountCustom" style="width:70px;margin-top:3px" value="${escapeAttr(l.mountCustom || '')}" placeholder="flange, e.g. 40mm as 0.04m">`
       : '';
     return `
-    <tr>
-      <td><input type="text" class="narrow" value="${escapeAttr(l.name)}" placeholder="e.g. 35mm Master Prime"
-            oninput="onLensInput(${l.id}, 'name', this)"></td>
-      <td><input type="text" class="narrow dist" value="${escapeAttr(l.cf)}" placeholder="e.g. 2' 6&quot;"
-            oninput="onLensInput(${l.id}, 'cf', this)"></td>
-      <td><input type="text" class="narrow dist" value="${escapeAttr(l.lensLen)}" placeholder="e.g. 0.2m"
-            oninput="onLensInput(${l.id}, 'lensLen', this)"></td>
-      <td><select onchange="onLensInput(${l.id}, 'mount', this)"><option value=""${mount === '' ? ' selected' : ''}>—</option>${mountOptions}</select>${customField ? '<br>' + customField : ''}</td>
-      <td>${i > 0 ? `<span class="mv" title="Move up" onclick="moveLens(${l.id}, -1)">▲</span>` : ''}${i < last ? `<span class="mv" title="Move down" onclick="moveLens(${l.id}, 1)">▼</span>` : ''}<span class="rm" onclick="removeLens(${l.id})">delete</span></td>
+    <tr data-id="${l.id}">
+      <td><input type="text" class="narrow" data-field="name" value="${escapeAttr(l.name)}" placeholder="e.g. 35mm Master Prime"></td>
+      <td><input type="text" class="narrow dist" data-field="cf" value="${escapeAttr(l.cf)}" placeholder="e.g. 2' 6&quot;"></td>
+      <td><input type="text" class="narrow dist" data-field="lensLen" value="${escapeAttr(l.lensLen)}" placeholder="e.g. 0.2m"></td>
+      <td><select data-field="mount"><option value=""${mount === '' ? ' selected' : ''}>—</option>${mountOptions}</select>${customField ? '<br>' + customField : ''}</td>
+      <td>${i > 0 ? `<button class="mv" data-act="mv" data-dir="-1" title="Move up" aria-label="Move up">▲</button>` : ''}${i < last ? `<button class="mv" data-act="mv" data-dir="1" title="Move down" aria-label="Move down">▼</button>` : ''}<button class="rm" data-act="rm">delete</button></td>
     </tr>`;
   }).join('');
   refreshInputHints();
@@ -899,6 +1055,39 @@ function builtInAsLensArray(name) {
   return BUILT_IN_SETS[name].map(([lensName, cf, lensLen, mount]) => ({ name: lensName, cf, lensLen, mount, mountCustom: '' }));
 }
 
+/* ---------- inline notices & confirms ----------
+   One reusable panel next to the set toolbar handles notices, the
+   save-name form, and confirm steps — no alert/prompt/confirm anywhere,
+   which also keeps the app usable inside embedded webviews.
+   Notes auto-hide; confirms wait for a button. */
+const panelState = { pending: null }; // { name } carried into a confirm step
+let panelTimer = null;
+function setPanel(html, kind) {
+  const p = el('setPanel');
+  clearTimeout(panelTimer);
+  if (!html) { p.hidden = true; p.innerHTML = ''; return; }
+  p.className = 'inline-panel no-print' + (kind ? ' ' + kind : '');
+  p.innerHTML = html;
+  p.hidden = false;
+}
+function setPanelNote(msg, kind) {
+  panelState.pending = null;
+  setPanel(`<span>${escapeText(msg)}</span><span class="spacer"></span><button data-act="panel-cancel" aria-label="Dismiss">✕</button>`, kind);
+  panelTimer = setTimeout(() => setPanel(null), 6000);
+}
+function panelConfirm(msgHtml, actions) {
+  const btns = actions.map(a => `<button${a.primary ? ' class="primary"' : ''} data-act="${a.act}">${a.label}</button>`).join('');
+  setPanel(`<span>${msgHtml}</span><span class="spacer"></span>${btns}<button data-act="panel-cancel">Cancel</button>`);
+}
+let chartNoteTimer = null;
+function chartNoteMsg(msg) {
+  const n = el('chartNote');
+  n.textContent = msg;
+  n.hidden = false;
+  clearTimeout(chartNoteTimer);
+  chartNoteTimer = setTimeout(() => { n.hidden = true; }, 6000);
+}
+
 /* ---------- saved lens sets (browser storage, guarded) ----------
    Storage may be unavailable (private windows, sandboxed previews). Everything
    is wrapped so the rest of the app is unaffected; controls disable with a note.
@@ -933,50 +1122,89 @@ function refreshSetSelect(selectName) {
   if (selectName && (builtInNames.includes(selectName) || savedNames.includes(selectName))) select.value = selectName;
 }
 function saveCurrentSet() {
-  if (state.lenses.length === 0) { alert('Add some lenses first.'); return; }
-  const name = (prompt('Name this lens set:') || '').trim();
-  if (!name) return;
-  if (BUILT_IN_SETS[name]) { alert('That name is used by a built-in preset — choose another name.'); return; }
+  if (state.lenses.length === 0) { setPanelNote('Add some lenses first.', 'warn'); return; }
+  setPanel(`<label for="setNameInput" style="margin:0">Name this lens set</label>` +
+    `<input type="text" id="setNameInput" class="narrow">` +
+    `<button class="primary" data-act="save-do">Save</button>` +
+    `<button data-act="panel-cancel">Cancel</button>` +
+    `<span class="inline-note" id="setNameErr"></span>`);
+  el('setNameInput').focus();
+}
+function trySaveSet() {
+  const inp = el('setNameInput');
+  if (!inp) return;
+  const name = inp.value.trim();
+  if (!name) { inp.classList.add('bad'); inp.focus(); return; }
+  inp.classList.remove('bad');
+  if (BUILT_IN_SETS[name]) { el('setNameErr').textContent = 'That name is a built-in preset — choose another.'; return; }
+  if (readStore()[name]) {
+    panelState.pending = { name };
+    panelConfirm(`"${escapeText(name)}" already exists.`, [{ label: 'Overwrite', act: 'save-overwrite', primary: true }]);
+    return;
+  }
+  commitSaveSet(name);
+}
+function commitSaveSet(name) {
   const sets = readStore();
-  if (sets[name] && !confirm(`"${name}" already exists. Overwrite it?`)) return;
   sets[name] = state.lenses.map(l => ({ name: l.name, cf: l.cf, lensLen: l.lensLen, mount: l.mount || '', mountCustom: l.mountCustom || '' }));
-  if (!writeStore(sets)) { alert('Could not save — browser storage unavailable or full.'); return; }
+  if (!writeStore(sets)) { setPanelNote('Could not save — browser storage unavailable or full.', 'warn'); return; }
   refreshSetSelect(name);
+  setPanelNote(`Saved "${name}".`, 'ok');
 }
 function loadSelectedSet() {
   const name = el('setSelect').value;
-  if (!name) { alert('No saved set selected.'); return; }
+  if (!name || (!BUILT_IN_SETS[name] && !readStore()[name])) { setPanelNote('No saved set selected.', 'warn'); return; }
   const hasContent = state.lenses.some(l => (l.name || l.cf || l.lensLen));
-  if (hasContent && !confirm(`Replace the current lens table with "${name}"?`)) return;
-
+  if (!hasContent) { commitLoadSet(name, 'replace'); return; } // nothing to lose or merge — just load
+  panelState.pending = { name };
+  panelConfirm(`Load "${escapeText(name)}" — add its lenses to the current table, or replace them?`, [
+    { label: 'Add to current', act: 'load-add' },
+    { label: 'Replace', act: 'load-replace', primary: true }
+  ]);
+}
+function commitLoadSet(name, mode) {
+  let incoming;
   if (BUILT_IN_SETS[name]) {
-    state.lenses = builtInAsLensArray(name).map(l => ({ id: state.nextId++, ...l }));
+    incoming = builtInAsLensArray(name);
   } else {
     const sets = readStore();
-    if (!sets[name]) { alert('No saved set selected.'); return; }
-    state.lenses = sets[name].map(l => ({ id: state.nextId++, name: l.name || '', cf: l.cf || '', lensLen: l.lensLen || '', mount: l.mount || '', mountCustom: l.mountCustom || '' }));
+    if (!sets[name]) { setPanelNote('No saved set selected.', 'warn'); return; }
+    incoming = sets[name].map(l => ({ name: l.name || '', cf: l.cf || '', lensLen: l.lensLen || '', mount: l.mount || '', mountCustom: l.mountCustom || '' }));
   }
+  const withIds = incoming.map(l => ({ id: state.nextId++, ...l }));
+  if (mode === 'add') {
+    // Drop rows with nothing typed in them so an unused starter row
+    // doesn't sit in the middle of the combined list.
+    state.lenses = state.lenses.filter(l => l.name || l.cf || l.lensLen).concat(withIds);
+  } else {
+    state.lenses = withIds;
+  }
+  setPanel(null);
   renderLensTable();
   renderOutputs();
 }
 function deleteSelectedSet() {
   const name = el('setSelect').value;
-  if (BUILT_IN_SETS[name]) { alert('Built-in presets can\'t be deleted.'); return; }
+  if (BUILT_IN_SETS[name]) { setPanelNote('Built-in presets can\'t be deleted.', 'warn'); return; }
+  if (!name || !readStore()[name]) { setPanelNote('No saved set selected.', 'warn'); return; }
+  panelState.pending = { name };
+  panelConfirm(`Delete saved set "${escapeText(name)}"?`, [{ label: 'Delete', act: 'delete-do', primary: true }]);
+}
+function commitDeleteSet(name) {
   const sets = readStore();
-  if (!name || !sets[name]) { alert('No saved set selected.'); return; }
-  if (!confirm(`Delete saved set "${name}"?`)) return;
   delete sets[name];
   writeStore(sets);
   refreshSetSelect();
+  setPanelNote(`Deleted "${name}".`, 'ok');
 }
 function initSavedSets() {
   el('btnLoadSet').disabled = false;
   el('setSelect').disabled = false;
   if (!storageOK) {
     ['btnSaveSet', 'btnDeleteSet'].forEach(id => { el(id).disabled = true; });
-    el('storageNote').textContent = 'Built-in manufacturer presets always work. Saving your own sets needs browser storage, which isn\'t available in this environment — that part works when the file is opened directly in a browser or hosted on a site. Export lenses works regardless, and lets you send your current set to someone else to load via Import CSV.';
+    el('storageNote').textContent = 'Built-in manufacturer presets always work. Saving your own sets needs browser storage, which isn\'t available in this environment — that part works when the file is opened directly in a browser or hosted on a site. Export CSV works regardless, and lets you send your current set to someone else to load via Import CSV.';
   } else {
-    el('storageNote').textContent = 'Your saved sets are stored in this browser only. Built-in presets are always available. Export lenses to send your current set to someone else — they can load it with Import CSV.';
+    el('storageNote').textContent = 'Your saved sets are stored in this browser only. Built-in presets are always available. Export CSV to send your current set to someone else — they can load it with Import CSV.';
   }
   refreshSetSelect();
 }
@@ -986,23 +1214,49 @@ function renderOutputs() {
   const derived = derive(el('mountingGap').value);
   renderChart(derived);
   renderResultsTable(derived);
+  persistState(); // every state mutation ends here, so this covers them all
+}
+
+/* The chart draws with CSS variables so it follows the theme on screen and
+   prints light via the print token override. The PNG export leaves the page
+   entirely, where var() can't resolve — so at export time each var() is
+   swapped for these fixed LIGHT hex values (exports are always light: charts
+   end up printed and on call sheets). Keep them matching :root above. */
+const EXPORT_HEX = {
+  '--ink': '#1b1d1e',
+  '--steel': '#5b6266',
+  '--line': '#dcdfda',
+  '--line-strong': '#c6c9c4',
+  '--bg-soft': '#eceee9',
+  '--focus-green': '#1a7a4c',
+  '--warn-red': '#a3273a',
+  '--diopter-blue': '#4c6b8a'
+};
+function svgVarsToExportHex(xml) {
+  return xml.replace(/var\((--[a-z-]+)\)/g, (m, name) => EXPORT_HEX[name] || '#000');
 }
 
 function renderChart({ gap, reference, lensData }) {
   const container = el('allLensesChartContainer');
-  if (state.lenses.length === 0) { container.innerHTML = '<p class="note">Add lenses to see this chart.</p>'; return; }
+  if (state.lenses.length === 0) { container.innerHTML = '<p class="note">Add lenses to see this graph.</p>'; return; }
   if (lensData.length === 0) {
     container.innerHTML = '<p class="note">Fill in name, close focus' + (reference === 'filmplane' ? ', lens length, and mount' : '') + ' for a lens to see it here.</p>';
     return;
   }
-  if (!state.diopters.some(dp => typeof dp.power === 'number' && dp.power !== 0)) { container.innerHTML = '<p class="note">Add a diopter with a strength value to see this chart.</p>'; return; }
+  if (!state.diopters.some(dp => typeof dp.power === 'number' && dp.power !== 0)) { container.innerHTML = '<p class="note">Add a diopter with a strength value to see this graph.</p>'; return; }
 
   let minVal = Infinity, maxVal = -Infinity;
   lensData.forEach(ld => {
-    ld.rows.forEach(r => { if (r.valid) { minVal = Math.min(minVal, r.near); maxVal = Math.max(maxVal, r.far); } });
+    ld.rows.forEach(r => {
+      if (!r.valid) return;
+      minVal = Math.min(minVal, r.near);
+      // Infinite far limits (negative diopters) can't set the scale — their
+      // bars run to the plot edge whatever the domain is.
+      maxVal = Math.max(maxVal, isFinite(r.far) ? r.far : r.near);
+    });
     minVal = Math.min(minVal, ld.marker); maxVal = Math.max(maxVal, ld.marker);
   });
-  if (!isFinite(minVal)) { container.innerHTML = '<p class="invalid">No valid values to chart yet.</p>'; return; }
+  if (!isFinite(minVal)) { container.innerHTML = '<p class="invalid">No valid values to graph yet.</p>'; return; }
 
   const range = (maxVal - minVal) || 1;
   const pad = range * 0.12;
@@ -1030,16 +1284,16 @@ function renderChart({ gap, reference, lensData }) {
   let svg = `<svg viewBox="0 0 ${chartWidth} ${chartHeight}" width="100%" style="max-width:${chartWidth}px" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, Arial, sans-serif" font-size="11">`;
 
   groupBounds.forEach((gb, idx) => {
-    if (idx % 2 === 0) svg += `<rect x="0" y="${gb.top}" width="${chartWidth}" height="${gb.height}" fill="#eceee9"/>`;
+    if (idx % 2 === 0) svg += `<rect x="0" y="${gb.top}" width="${chartWidth}" height="${gb.height}" fill="var(--bg-soft)"/>`;
   });
   minor.forEach(t => {
     const x = scaleX(t);
-    svg += `<line x1="${x}" y1="${axisY - 3}" x2="${x}" y2="${axisY + 3}" stroke="#c6c9c4" stroke-width="1"/>`;
+    svg += `<line x1="${x}" y1="${axisY - 3}" x2="${x}" y2="${axisY + 3}" stroke="var(--line-strong)" stroke-width="1"/>`;
   });
   major.forEach(t => {
     const x = scaleX(t);
-    svg += `<line x1="${x}" y1="${axisY}" x2="${x}" y2="${chartHeight - 8}" stroke="#dcdfda" stroke-width="1"/>`;
-    svg += `<text x="${x}" y="${topMargin - 14}" text-anchor="middle" fill="#5b6266">${fmtTick(t)}</text>`;
+    svg += `<line x1="${x}" y1="${axisY}" x2="${x}" y2="${chartHeight - 8}" stroke="var(--line)" stroke-width="1"/>`;
+    svg += `<text x="${x}" y="${topMargin - 14}" text-anchor="middle" fill="var(--steel)">${fmtTick(t)}</text>`;
   });
 
   lensData.forEach((ld, idx) => {
@@ -1048,33 +1302,41 @@ function renderChart({ gap, reference, lensData }) {
     // Reserve the space up to the marker line for the name; truncated with an
     // ellipsis after render if it doesn't fit (measured, not guessed).
     const nameMaxWidth = Math.max(30, mx - 12);
-    svg += `<text class="lensname" data-full="${escapeAttr(ld.lens.name)}" data-maxw="${nameMaxWidth}" x="6" y="${gb.top + 14}" fill="#1b1d1e" font-weight="bold"><title>${escapeText(ld.lens.name)}</title>${escapeText(ld.lens.name)}</text>`;
-    svg += `<line x1="${mx}" y1="${gb.top + 2}" x2="${mx}" y2="${gb.top + headerHeight - 2}" stroke="#1a7a4c" stroke-width="2.5"/>`;
+    svg += `<text class="lensname" data-full="${escapeAttr(ld.lens.name)}" data-maxw="${nameMaxWidth}" x="6" y="${gb.top + 14}" fill="var(--ink)" font-weight="bold"><title>${escapeText(ld.lens.name)}</title>${escapeText(ld.lens.name)}</text>`;
+    svg += `<line x1="${mx}" y1="${gb.top + 2}" x2="${mx}" y2="${gb.top + headerHeight - 2}" stroke="var(--focus-green)" stroke-width="2.5"/>`;
     // Value of the close-focus marker, so the reference point is readable without
     // cross-checking the lens table. Flips to the left of the line near the edge.
     const cfLabel = `CF ${fmt(ld.marker)}`;
     const flipLeft = mx > leftMargin + plotWidth - 70;
     svg += `<text x="${mx + (flipLeft ? -5 : 5)}" y="${gb.top + 14}" ` +
-           `text-anchor="${flipLeft ? 'end' : 'start'}" fill="#1a7a4c" font-size="10" font-weight="bold">${cfLabel}</text>`;
+           `text-anchor="${flipLeft ? 'end' : 'start'}" fill="var(--focus-green)" font-size="10" font-weight="bold">${cfLabel}</text>`;
 
     ld.rows.forEach((r, ri) => {
       const rowY = gb.top + headerHeight + ri * rowHeight + rowHeight / 2;
-      svg += `<text x="6" y="${rowY + 4}" fill="#1b1d1e">${r.label}</text>`;
+      svg += `<text x="6" y="${rowY + 4}" fill="var(--ink)">${r.label}</text>`;
       if (!r.valid) {
-        svg += `<text x="${leftMargin}" y="${rowY + 4}" fill="#a3273a" font-style="italic">${r.invalidReason}</text>`;
+        svg += `<text x="${leftMargin}" y="${rowY + 4}" fill="var(--steel)" font-style="italic">${r.invalidReason}</text>`;
         return;
       }
-      const x1 = scaleX(r.near), x2 = scaleX(r.far);
-      const barColor = r.d < 0 ? '#4c6b8a' : '#a3273a';
+      // Negative diopters have an infinite far limit: their bar runs from the
+      // near limit to the plot edge and ends in an arrow instead of a value.
+      const infinite = !isFinite(r.far);
+      const x1 = scaleX(r.near), x2 = infinite ? leftMargin + plotWidth : scaleX(r.far);
+      const barColor = r.d < 0 ? 'var(--diopter-blue)' : 'var(--warn-red)';
       const barWidth = Math.abs(x2 - x1);
-      const rangeLabel = fmt(Math.abs(r.far - r.near));
 
       svg += `<rect x="${Math.min(x1, x2)}" y="${rowY - barHeight / 2}" width="${Math.max(2, barWidth)}" height="${barHeight}" rx="3" fill="${barColor}" opacity="0.85"/>`;
+      svg += `<text x="${Math.min(x1, x2) - 4}" y="${rowY + 4}" text-anchor="end" fill="var(--ink)" font-size="10">${fmt(r.near)}</text>`;
+      if (infinite) {
+        svg += `<path d="M ${x2},${rowY - barHeight / 2} L ${x2 + 7},${rowY} L ${x2},${rowY + barHeight / 2} Z" fill="${barColor}" opacity="0.85"/>`;
+        svg += `<text x="${x2 + 11}" y="${rowY + 4}" text-anchor="start" fill="var(--ink)" font-size="12">∞</text>`;
+        return;
+      }
+      const rangeLabel = fmt(Math.abs(r.far - r.near));
       // Inside-bar range label; a post-render getBBox pass moves it into brackets
       // after the far value if it doesn't actually fit inside the bar.
       svg += `<text class="rangeIn" data-bw="${barWidth}" data-far="far-${idx}-${ri}" x="${(x1 + x2) / 2}" y="${rowY + 3}" text-anchor="middle" fill="#fff" font-size="9" font-weight="bold">${rangeLabel}</text>`;
-      svg += `<text x="${Math.min(x1, x2) - 4}" y="${rowY + 4}" text-anchor="end" fill="#1b1d1e" font-size="10">${fmt(r.near)}</text>`;
-      svg += `<text id="far-${idx}-${ri}" x="${Math.max(x1, x2) + 4}" y="${rowY + 4}" text-anchor="start" fill="#1b1d1e" font-size="10">${fmt(r.far)}</text>`;
+      svg += `<text id="far-${idx}-${ri}" x="${Math.max(x1, x2) + 4}" y="${rowY + 4}" text-anchor="start" fill="var(--ink)" font-size="10">${fmt(r.far)}</text>`;
     });
   });
 
@@ -1114,7 +1376,7 @@ function renderResultsTable({ lensData }) {
     const shade = (idx % 2 === 0) ? 'lens-even' : 'lens-odd';
     ld.rows.forEach(r => {
       if (!r.valid) {
-        rows.push(`<tr class="${shade}"><td>${escapeText(ld.lens.name)}</td><td>${r.label}</td><td colspan="3" class="invalid">invalid</td></tr>`);
+        rows.push(`<tr class="${shade}"><td>${escapeText(ld.lens.name)}</td><td>${r.label}</td><td colspan="3" class="invalid">${r.invalidReason}</td></tr>`);
         return;
       }
       rows.push(`<tr class="${shade}">
@@ -1182,7 +1444,7 @@ function renderGapBreakdown(lensData) {
   const labels = [`${mountName} flange`, 'Lens length', 'Mounting gap'];
   const values = [fx(gp.flange), fx(gp.lensLen), fx(gp.gap)];
   if (hasThk) {
-    labels.push(`½ diopter thickness (${exRow.label})`);
+    labels.push('½ diopter glass thickness');
     values.push(fx(exRow.halfThk));
   }
   const sub = hasThk ? exRow.sub : gp.baseSub;
@@ -1195,25 +1457,32 @@ function renderGapBreakdown(lensData) {
   // --- 2 & 3. near and far limits ---
   if (exRow.valid) {
     const d = exRow.d;
-    const sd = ld.cf - sub;                 // subject distance from the diopter, at close focus
+    const sd = ld.cf - sub;                 // DS: diopter-to-subject distance at the lens's close focus
     const addTerm = fromFilmPlane ? `  +  Total distance from film plane to diopter` : ``;
     const addVal = fromFilmPlane ? `  +  ${fx(sub)}` : ``;
 
     html +=
-      `<p style="margin:16px 0 2px"><b>SD — subject distance from diopter</b><br>` +
-      `<span class="note">The lens's close focus, re-measured from the diopter instead of the film plane. ` +
+      `<p style="margin:16px 0 2px"><b>DS — diopter to subject distance</b><br>` +
+      `<span class="note">The lens's close focus, re-measured from the diopter instead of the film plane — ` +
+      `a measurement used only for calculating the diopter's limits. ` +
       `Not the same as close focus, which stays the lens's own spec.</span></p>` +
-      `<div class="calc">SD  =  Close focus  −  Total distance from film plane to diopter</div>` +
-      `<div class="calc">SD  =  ${fx(ld.cf)}  −  ${fx(sub)}  =  ${fx(sd)}  (${fmtAlt(sd)})</div>`;
+      `<div class="calc">DS  =  Close focus  −  Total distance from film plane to diopter</div>` +
+      `<div class="calc">DS  =  ${fx(ld.cf)}  −  ${fx(sub)}  =  ${fx(sd)}  (${fmtAlt(sd)})</div>`;
 
     html +=
       `<p style="margin:16px 0 2px"><b>The standard formula</b><br>` +
       `<span class="note">Both limits come from the vergence equation for a close-up lens — ` +
-      `<b>1 ÷ new distance = (1 ÷ SD) + diopter strength</b>. The far limit is just this with the lens at ` +
-      `infinity (SD = ∞), which leaves 1 ÷ diopter strength.</span></p>`;
+      `<b>1 ÷ new distance = (1 ÷ DS) + diopter strength</b>. Rearranged to give the new distance directly: ` +
+      `<b>new distance = DS ÷ (1 + diopter strength × DS)</b> — the same form as the near limit below. ` +
+      `The far limit is just this with the lens at infinity (DS = ∞), which leaves 1 ÷ diopter strength.</span></p>`;
 
     html += `<p style="margin:16px 0 2px"><b>Far limit</b></p>`;
-    if (fromFilmPlane) {
+    if (d < 0) {
+      html += `<div class="calc">Negative diopter  →  far limit = ∞</div>` +
+              `<p class="note" style="margin:4px 0 0">A negative diopter shifts the whole focus range outward. ` +
+              `The combination reaches infinity while the lens itself is set to −1 ÷ (${d}) = ${fx(-1 / d)} on its own scale, ` +
+              `so there is no far cap — only the near limit below applies.</p>`;
+    } else if (fromFilmPlane) {
       html += `<div class="calc">(1 ÷ diopter strength)${addTerm}</div>` +
               `<div class="calc">(1 ÷ ${d})${addVal}  =  ${fx(exRow.far)}  (${fmtAlt(exRow.far)})</div>`;
     } else {
@@ -1222,9 +1491,9 @@ function renderGapBreakdown(lensData) {
     }
 
     html += `<p style="margin:16px 0 2px"><b>Near limit</b></p>` +
-            `<div class="calc">SD ÷ (1 + diopter strength × SD)${addTerm}</div>` +
+            `<div class="calc">DS ÷ (1 + diopter strength × DS)${addTerm}</div>` +
             `<div class="calc">${fx(sd)} ÷ (1 + ${d} × ${sd.toFixed(3)})${addVal}  =  ${fx(exRow.near)}  (${fmtAlt(exRow.near)})</div>` +
-            `<p class="note" style="margin:4px 0 0">Diopter strength is defined per metre, so SD is used in metres (${sd.toFixed(3)} m) inside the bracket.</p>`;
+            `<p class="note" style="margin:4px 0 0">Diopter strength is defined per metre, so DS is used in metres (${sd.toFixed(3)} m) inside the bracket.</p>`;
   }
 
   box.innerHTML = html;
@@ -1233,14 +1502,14 @@ function renderGapBreakdown(lensData) {
 /* ---------- chart PNG download ---------- */
 function downloadChartPNG() {
   const svgEl = el('allLensesChartContainer').querySelector('svg');
-  if (!svgEl) { alert('Nothing to export yet — fill in a lens first.'); return; }
+  if (!svgEl) { chartNoteMsg('Nothing to export yet — fill in a lens first.'); return; }
   const vb = svgEl.viewBox.baseVal;
   const scale = 2; // 2x for crisp output
   const clone = svgEl.cloneNode(true);
   clone.setAttribute('width', vb.width);
   clone.setAttribute('height', vb.height);
   clone.removeAttribute('style');
-  const xml = new XMLSerializer().serializeToString(clone);
+  const xml = svgVarsToExportHex(new XMLSerializer().serializeToString(clone));
   const svgBlob = new Blob([xml], { type: 'image/svg+xml;charset=utf-8' });
   const url = URL.createObjectURL(svgBlob);
   const img = new Image();
@@ -1254,11 +1523,11 @@ function downloadChartPNG() {
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     URL.revokeObjectURL(url);
     canvas.toBlob(blob => {
-      if (!blob) { alert('Could not render the chart image.'); return; }
-      triggerDownload(blob, 'diopter-chart.png');
+      if (!blob) { chartNoteMsg('Could not render the graph image.'); return; }
+      triggerDownload(blob, 'diopter-graph.png');
     }, 'image/png');
   };
-  img.onerror = () => { URL.revokeObjectURL(url); alert('Could not render the chart image.'); };
+  img.onerror = () => { URL.revokeObjectURL(url); chartNoteMsg('Could not render the graph image.'); };
   img.src = url;
 }
 
@@ -1268,14 +1537,14 @@ function handleCSVImport(file) {
   const reader = new FileReader();
   reader.onload = e => {
     const rows = parseCSV(e.target.result);
-    if (rows.length < 2) { alert('CSV needs a header row plus at least one lens row.'); return; }
+    if (rows.length < 2) { setPanelNote('CSV needs a header row plus at least one lens row.', 'warn'); return; }
     const header = rows[0].map(h => h.trim().toLowerCase());
     const nameIdx = header.findIndex(h => h.includes('name'));
     const cfIdx = header.findIndex(h => h.includes('close'));
     const lenIdx = header.findIndex(h => h.includes('length'));
     const mountIdx = header.findIndex(h => h.includes('mount'));
     if (nameIdx === -1 || cfIdx === -1 || lenIdx === -1) {
-      alert('Could not find "Lens name", "Close focus", and "Lens Length" columns in the header row.');
+      setPanelNote('Could not find "Lens name", "Close focus", and "Lens Length" columns in the header row.', 'warn');
       return;
     }
     const knownMounts = ['PL', 'LPL', 'PV'];
@@ -1302,7 +1571,8 @@ function handleCSVImport(file) {
     renderLensTable();
     renderOutputs();
     el('csvImport').value = '';
-    if (imported === 0) alert('No lens rows found to import.');
+    if (imported === 0) setPanelNote('No lens rows found to import.', 'warn');
+    else setPanelNote(`Imported ${imported} ${imported === 1 ? 'lens' : 'lenses'}.`, 'ok');
   };
   reader.readAsText(file);
 }
@@ -1337,7 +1607,7 @@ function downloadCSVTemplate() {
    mount's flange distance is written directly in the Mount column, which
    Import CSV already treats as a custom flange when it isn't PL/LPL/PV. */
 function exportLensesCSV() {
-  if (state.lenses.length === 0) { alert('Add a lens first.'); return; }
+  if (state.lenses.length === 0) { setPanelNote('Add a lens first.', 'warn'); return; }
   const lines = [['Lens name', 'Close focus', 'Lens Length', 'Mount'].map(csvField).join(',')];
   state.lenses.forEach(l => {
     const mountOut = l.mount === 'custom' ? (l.mountCustom || '') : (l.mount || '');
@@ -1350,7 +1620,7 @@ function exportResultsCSV() {
   const { gap, reference, lensData } = derive(el('mountingGap').value);
   const referenceLabel = reference === 'filmplane' ? 'the film plane' : 'the diopter';
   const lines = [];
-  lines.push(`Note: mounting gap used for these calculations = ${fmt(gap)} (distance from diopter to front of lens). Distances below are measured from ${referenceLabel}.`);
+  lines.push(csvField(`Note: mounting gap used for these calculations = ${fmt(gap)} (distance from diopter to front of lens). Distances below are measured from ${referenceLabel}.`));
   lines.push('');
   lines.push(['Lens name', 'Close focus', 'Lens length (front to mount)', 'Mount', 'Diopter', 'Near limit', 'Far limit', 'Range'].map(csvField).join(','));
   lensData.forEach(ld => {
@@ -1371,8 +1641,100 @@ function exportResultsCSV() {
   downloadCSV('diopter-results.csv', lines);
 }
 
+/* ---------- event wiring ----------
+   No inline on* attributes anywhere: static controls are bound once by
+   id/name; table rows use delegation on the tbody (which survives every
+   innerHTML rebuild), reading the row id and field from data attributes.
+   This keeps the markup declarative and the file CSP-compatible if hosted. */
+function bindEvents() {
+  document.querySelectorAll('input[name="unit"]').forEach(r => r.addEventListener('change', () => setUnit(r.value)));
+  document.querySelectorAll('input[name="reference"]').forEach(r => r.addEventListener('change', () => setReference(r.value)));
+  el('mountingGap').addEventListener('input', e => onDistanceInput(e.target));
+
+  el('btnAddDiopter').addEventListener('click', addDiopter);
+  el('btnAddLens').addEventListener('click', addLens);
+  el('btnLoadSet').addEventListener('click', loadSelectedSet);
+  el('btnSaveSet').addEventListener('click', saveCurrentSet);
+  el('btnDeleteSet').addEventListener('click', deleteSelectedSet);
+  el('csvImport').addEventListener('change', e => handleCSVImport(e.target.files[0]));
+  el('btnCSVTemplate').addEventListener('click', downloadCSVTemplate);
+  el('btnExportLenses').addEventListener('click', exportLensesCSV);
+  el('btnPrint').addEventListener('click', () => window.print());
+  el('btnDownloadPNG').addEventListener('click', downloadChartPNG);
+  el('btnExportResults').addEventListener('click', exportResultsCSV);
+  el('breakdownLens').addEventListener('change', renderOutputs);
+  el('breakdownDiopter').addEventListener('change', renderOutputs);
+  el('btnTheme').addEventListener('click', () => setTheme(state.theme === 'dark' ? 'light' : 'dark'));
+
+  // The inline panel's own buttons (confirm steps, dismiss, save form).
+  el('setPanel').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    const act = btn.dataset.act;
+    const pendingName = panelState.pending && panelState.pending.name;
+    if (act === 'panel-cancel') { panelState.pending = null; setPanel(null); }
+    else if (act === 'save-do') trySaveSet();
+    else if (act === 'save-overwrite') { panelState.pending = null; if (pendingName) commitSaveSet(pendingName); }
+    else if (act === 'load-add') { panelState.pending = null; if (pendingName) commitLoadSet(pendingName, 'add'); }
+    else if (act === 'load-replace') { panelState.pending = null; if (pendingName) commitLoadSet(pendingName, 'replace'); }
+    else if (act === 'delete-do') { panelState.pending = null; if (pendingName) commitDeleteSet(pendingName); }
+  });
+  el('setPanel').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.id === 'setNameInput') { e.preventDefault(); trySaveSet(); }
+  });
+
+  const rowId = target => {
+    const tr = target.closest('tr[data-id]');
+    return tr ? Number(tr.dataset.id) : null;
+  };
+
+  const dpBody = document.querySelector('#diopterTable tbody');
+  dpBody.addEventListener('input', e => {
+    const id = rowId(e.target);
+    if (id === null) return;
+    if (e.target.dataset.field === 'power') onDiopterPowerInput(id, e.target);
+    else if (e.target.dataset.field === 'thickness') onDiopterThicknessInput(id, e.target);
+  });
+  // blur doesn't bubble; focusout does.
+  dpBody.addEventListener('focusout', e => {
+    if (e.target.dataset && e.target.dataset.field === 'power') {
+      const id = rowId(e.target);
+      if (id !== null) onDiopterPowerBlur(id, e.target);
+    }
+  });
+  dpBody.addEventListener('click', e => {
+    const btn = e.target.closest('button[data-act="rm"]');
+    if (!btn) return;
+    const id = rowId(btn);
+    if (id !== null) removeDiopter(id);
+  });
+
+  const lensBody = document.querySelector('#lensTable tbody');
+  lensBody.addEventListener('input', e => {
+    if (!e.target.matches('input[data-field]')) return;
+    const id = rowId(e.target);
+    if (id !== null) onLensInput(id, e.target.dataset.field, e.target);
+  });
+  lensBody.addEventListener('change', e => {
+    if (!e.target.matches('select[data-field="mount"]')) return;
+    const id = rowId(e.target);
+    if (id !== null) onLensInput(id, 'mount', e.target);
+  });
+  lensBody.addEventListener('click', e => {
+    const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    const id = rowId(btn);
+    if (id === null) return;
+    if (btn.dataset.act === 'rm') removeLens(id);
+    else if (btn.dataset.act === 'mv') moveLens(id, Number(btn.dataset.dir));
+  });
+}
+
 /* ---------- init ---------- */
+bindEvents();
 initSavedSets();
+loadPersistedState();
+setTheme(state.theme); // applies the html attribute + button label
 renderUnitDefaultNote();
 el('versionNote').textContent = APP_VERSION;
 
@@ -1380,7 +1742,8 @@ const feedbackSubject = encodeURIComponent(`Diopter Calc feedback (${APP_VERSION
 const feedbackBody = encodeURIComponent(`Version: ${APP_VERSION}\n\n(Describe the bug or suggestion here)\n`);
 el('feedbackLink').href = `mailto:irwinsamj@gmail.com?subject=${feedbackSubject}&body=${feedbackBody}`;
 renderDiopterTable();
-addLens(); // start with one empty row for convenience
+if (state.lenses.length) { renderLensTable(); renderOutputs(); }
+else addLens(); // first visit: start with one empty row for convenience
 </script>
 
 </body>
