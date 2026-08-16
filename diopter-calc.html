@@ -74,7 +74,7 @@ try {
   }
 
   h1 { font-family: var(--font-sans); font-weight: 700; font-size: 25px; margin: 0 0 4px; letter-spacing: -0.01em; }
-  .tagline { color: var(--steel); font-size: 14px; margin: 0 0 6px; }
+  .tagline { color: var(--ink-soft); font-size: 17px; font-weight: 500; margin: 2px 0 14px; letter-spacing: -0.003em; }
 
   /* ---- sections ---- */
   section { border-top: 1px solid var(--line); padding-top: 22px; margin-top: 30px; }
@@ -164,7 +164,8 @@ try {
   button.rm, button.mv { border: none; background: none; padding: 2px 4px; border-radius: 4px; }
   button.rm:hover:not(:disabled), button.mv:hover:not(:disabled) { background: var(--bg-soft); border-color: transparent; }
   .rm { color: var(--warn-red); cursor: pointer; font-size: 12px; margin-left: 6px; }
-  .mv { color: var(--steel); cursor: pointer; font-size: 13px; margin-right: 5px; user-select: none; }
+  .mv { color: var(--steel); cursor: pointer; font-size: 13px; margin-right: 5px; user-select: none; width: 17px; box-sizing: border-box; display: inline-block; text-align: center; }
+  .mv:disabled { visibility: hidden; cursor: default; }
   .mv:hover { color: var(--ink); }
 
   /* Phones: wide tables and the chart scroll sideways inside their own
@@ -212,6 +213,29 @@ try {
   }
   a { color: var(--amber-deep); }
 
+  /* ---- explorer (drag playground) ---- */
+  #explorer { scroll-margin-top: 12px; }
+  .scene-scroll { overflow-x: auto; }
+  .scene {
+    display: block; width: 100%; min-width: 620px; max-width: 760px; height: auto;
+    margin-top: 6px; padding: 10px 6px 4px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  }
+  .scene .grab { cursor: ew-resize; touch-action: none; }
+  .scene .grab-hit { fill: transparent; cursor: ew-resize; touch-action: none; }
+  .stats { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 4px; }
+  .stat { flex: 1 1 140px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 9px 12px; }
+  .stat .k { font-family: var(--font-mono); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--steel); }
+  .stat .v { font-family: var(--font-mono); font-size: 19px; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .stat .alt { font-family: var(--font-mono); font-size: 11px; color: var(--steel); }
+  .stat.bad .v { font-size: 13px; color: var(--steel); font-style: italic; font-family: var(--font-sans); }
+  .ex-controls { display: flex; flex-wrap: wrap; gap: 14px 26px; margin-top: 16px; align-items: flex-start; }
+  .ex-control { width: 200px; max-width: 100%; }
+  .ex-control .label { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .ex-control .label output { color: var(--ink); text-transform: none; letter-spacing: 0; }
+  input[type=range] { width: 100%; accent-color: var(--amber-deep); margin: 2px 0 0; }
+  .presets { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 18px; }
+
   @media print {
     /* Print is always light — mirror the :root (light) tokens above. */
     :root[data-theme="dark"] {
@@ -255,6 +279,10 @@ try {
   </p>
 </noscript>
 <p class="tagline">Work out the near and far focus limits your diopters give you, for every lens in your set.</p>
+<p class="note" style="margin:0 0 14px">
+  <button id="btnJumpExplorer" class="no-print" style="padding:4px 10px; font-size:12px; vertical-align:middle">Explorer &#8595;</button>
+  <span style="vertical-align:middle">If you're interested in seeing how different lens sizes and close focuses change the diopter limits, try the Explorer at the bottom of the page.</span>
+</p>
 <p class="note" style="margin:0 0 24px">
   <a href="#" id="feedbackLink" style="color:inherit">Found a bug, or have a suggestion? Send feedback</a>
 </p>
@@ -478,10 +506,119 @@ try {
   </details>
 </section>
 
+<section id="explorer">
+  <h2><span class="step-num">&#8644;</span> Explore the geometry</h2>
+  <p class="lead">Drag the lens, the diopter, or the green CF mark &#8212; or use the sliders &#8212; and watch the limits react. Metric readouts here are in cm.</p>
+
+  <div class="scene-scroll">
+  <svg class="scene" id="scene" viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" role="img"
+       aria-label="Interactive side view on one true distance axis: camera, lens, mounting gap and diopter at their real positions, with the near and far focus limits on the same scale">
+    <!-- the one true axis: linear to 0.6 m, logarithmic beyond -->
+    <line x1="60" y1="110" x2="690" y2="110" stroke="var(--line-strong)" stroke-width="1.5"/>
+    <g id="barrelTicks"></g>
+    <!-- hardware, drawn ON the axis at true positions (covers ticks beneath) -->
+    <rect id="camBody" x="8" y="88" width="52" height="44" rx="2" fill="var(--bg-soft)" stroke="var(--ink)" stroke-width="1.2"/>
+    <line x1="60" y1="80" x2="60" y2="138" stroke="var(--steel)" stroke-width="1" stroke-dasharray="1.5,2.5"/>
+    <text x="60" y="156" text-anchor="middle" font-size="15" font-family="var(--font-mono)" fill="var(--steel)">&#981;</text>
+    <line id="flangeDim" x1="60" y1="58" x2="82" y2="58" stroke="var(--steel)" stroke-width="1"/>
+    <line x1="60" y1="53" x2="60" y2="63" stroke="var(--steel)" stroke-width="1"/>
+    <line id="flangeTickB" x1="82" y1="53" x2="82" y2="63" stroke="var(--steel)" stroke-width="1"/>
+    <text id="flangeLabel" x="71" y="50" text-anchor="middle" font-size="8.5" fill="var(--steel)">PL 52mm</text>
+    <path id="lensBody" class="grab" d="" fill="var(--bg-soft)" stroke="var(--ink)" stroke-width="1.2"/>
+    <line id="mountBar" x1="82" y1="98" x2="82" y2="122" stroke="var(--ink)" stroke-width="4"/>
+    <text id="mountLabel" x="82" y="84" text-anchor="middle" font-size="9.5" fill="var(--ink)">Lens mount</text>
+    <line id="frontEdge" class="grab" x1="0" y1="86" x2="0" y2="134" stroke="var(--amber-deep)" stroke-width="4" stroke-linecap="round"/>
+    <rect id="frontHit" class="grab-hit" x="0" y="80" width="20" height="60"/>
+    <ellipse id="diopterGlass" class="grab" cx="0" cy="110" rx="7" ry="27" fill="var(--amber-soft)" stroke="var(--amber-deep)" stroke-width="1.3"/>
+    <rect id="diopterHit" class="grab-hit" x="0" y="80" width="26" height="60"/>
+    <text id="dioTag" x="0" y="156" text-anchor="middle" font-size="9.5" fill="var(--ink)">Diopter &#8596;</text>
+    <g id="dimLen" stroke="var(--steel)">
+      <line id="dimLenA" x1="0" y1="172" x2="0" y2="172" stroke-width="1"/>
+      <line id="dimLenS" x1="0" y1="167" x2="0" y2="177" stroke-width="1"/>
+      <line id="dimLenB" x1="0" y1="167" x2="0" y2="177" stroke-width="1"/>
+    </g>
+    <text id="dimLenText" x="0" y="188" text-anchor="middle" font-size="9" fill="var(--steel)">Lens length</text>
+    <g id="dimGap" stroke="var(--amber-deep)">
+      <line id="dimGapA" x1="0" y1="198" x2="0" y2="198" stroke-width="1.3"/>
+      <line id="dimGapB" x1="0" y1="193" x2="0" y2="203" stroke-width="1.3"/>
+      <line id="dimGapC" x1="0" y1="193" x2="0" y2="203" stroke-width="1.3"/>
+    </g>
+    <text id="dimGapText" x="0" y="214" text-anchor="middle" font-size="9" font-weight="600" fill="var(--amber-deep)">gap</text>
+    <text id="barrelCaption" x="500" y="205" text-anchor="middle" font-size="9.5" fill="var(--steel)">Distance from film plane (&#981;)</text>
+    <!-- focus band + markers, on top of everything -->
+    <rect id="band" x="0" y="102" width="0" height="16" rx="3" fill="var(--warn-red)" opacity="0.85"/>
+    <path id="bandArrow" d="" fill="var(--warn-red)" opacity="0.85"/>
+    <text id="nearLabel" x="0" y="96" text-anchor="middle" font-size="10" fill="var(--ink)"></text>
+    <text id="farLabel" x="0" y="96" text-anchor="middle" font-size="10" fill="var(--ink)"></text>
+    <text id="bandNote" x="500" y="145" text-anchor="middle" font-size="10" fill="var(--steel)" font-style="italic"></text>
+    <line id="cfMark" class="grab" x1="0" y1="88" x2="0" y2="132" stroke="var(--focus-green)" stroke-width="2.5"/>
+    <rect id="cfHit" class="grab-hit" x="0" y="80" width="18" height="60"/>
+    <text id="cfLabel" x="0" y="76" text-anchor="middle" font-size="9.5" fill="var(--focus-green)" font-weight="600">CF &#8596;</text>
+  </svg>
+  </div>
+
+  <div class="stats">
+    <div class="stat" id="statNear"><div class="k">Near limit</div><div class="v">&#8212;</div><div class="alt"></div></div>
+    <div class="stat" id="statFar"><div class="k">Far limit</div><div class="v">&#8212;</div><div class="alt"></div></div>
+    <div class="stat" id="statRange"><div class="k">Range</div><div class="v">&#8212;</div><div class="alt"></div></div>
+  </div>
+  <p class="note" id="statSub"></p>
+
+  <div class="ex-controls">
+    <div class="ex-control">
+      <div class="label"><span>Diopter strength</span><output id="outD"></output></div>
+      <input type="range" id="inD" min="-2" max="4" step="0.25" value="1" aria-label="Diopter strength">
+    </div>
+    <div class="ex-control">
+      <div class="label"><span>Close focus</span><output id="outCF"></output></div>
+      <input type="range" id="inCF" min="0.2" max="2.5" step="0.01" value="0.6" aria-label="Close focus in metres">
+    </div>
+    <div class="ex-control">
+      <div class="label"><span>Lens length</span><output id="outLen"></output></div>
+      <input type="range" id="inLen" min="50" max="300" step="1" value="150" aria-label="Lens length in millimetres">
+    </div>
+    <div class="ex-control">
+      <div class="label"><span>Mounting gap</span><output id="outGap"></output></div>
+      <input type="range" id="inGap" min="0" max="150" step="1" value="25" aria-label="Mounting gap in millimetres">
+    </div>
+    <div class="ex-control">
+      <div class="label"><span>Glass thickness</span><output id="outThk"></output></div>
+      <input type="range" id="inThk" min="0" max="20" step="0.5" value="6" aria-label="Diopter glass thickness in millimetres">
+    </div>
+    <div class="ex-control">
+      <div class="label"><span>Mount</span><output id="outMount"></output></div>
+      <select id="inMount" aria-label="Lens mount">
+        <option value="PL" selected>PL</option>
+        <option value="LPL">LPL</option>
+        <option value="PV">PV</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="presets">
+    <span class="note">Try:</span>
+    <button data-d="0.5">+0.5</button>
+    <button data-d="1">+1</button>
+    <button data-d="2">+2</button>
+    <button data-d="3">+3</button>
+  </div>
+
+  <details>
+    <summary>Show the live maths</summary>
+    <div class="body">
+      <div class="calc" id="mathSub"></div><br>
+      <div class="calc" id="mathDS"></div><br>
+      <div class="calc" id="mathNear"></div><br>
+      <div class="calc" id="mathFar"></div>
+      <p class="note" style="margin:6px 0 0">Same formulas as the worked example above. Diopter strength is defined per metre, so DS is used in metres inside the bracket.</p>
+    </div>
+  </details>
+</section>
+
 <script>
 'use strict';
 // [pure-core-start]
-const APP_VERSION = 'v15'; // bump this on every revision — shown under the title
+const APP_VERSION = 'v22'; // bump this on every revision — shown under the title
 const M_PER_FT = 0.3048;
 
 /* Flange focal depth by mount type — the fixed distance from the mount's contact
@@ -637,31 +774,41 @@ function computeLensData(lens, gap, reference) {
     const halfThk = thickness / 2;
     const sub = baseSub + halfThk;           // film plane to diopter centre
     const addBack = reference === 'filmplane' ? sub : 0;
-    const effCF = cf - sub;
-    /* Positive D: near = effCF/(1 + D·effCF), far = 1/D (lens at infinity).
-       Negative D shifts the whole range outward: the combo reaches infinity
-       focus while the lens is set to −1/D, so the far limit IS infinity —
-       provided that setting is within the lens's travel, i.e. the near-limit
-       denominator (1 + D·effCF) is still positive. If it isn't, the diopter
-       is too strong for this lens and nothing real is in focus. */
-    let near = null, far = null, invalidReason = null;
-    if (effCF <= 0) {
-      invalidReason = 'close focus sits inside the diopter';
-    } else {
-      const denom = 1 + d * effCF;
-      if (denom > 0) near = effCF / denom + addBack;
-      else invalidReason = 'diopter too strong for this lens'; // only reachable when d < 0
-      far = d > 0 ? 1 / d + addBack : Infinity;
-    }
-    const valid = near !== null && near > 0 && far !== null && far > 0;
-    if (!valid && !invalidReason) invalidReason = 'out of range';
-    return { d, label: diopterLabel(d), near, far, valid, invalidReason: valid ? null : invalidReason, thickness, halfThk, sub };
+    const lim = focusLimits(d, cf, sub, addBack);
+    return { d, label: diopterLabel(d), near: lim.near, far: lim.far, valid: lim.valid, invalidReason: lim.invalidReason, thickness, halfThk, sub };
   });
 
   return {
     complete: true, cf, lensLen, flange, sub: baseSub, marker, rows,
     gapParts: { gap, lensLen: isNaN(lensLen) ? 0 : lensLen, flange: isNaN(flange) ? 0 : flange, baseSub }
   };
+}
+
+/* The single physics kernel — the results tables and the explorer both call
+   this, so they can never disagree.
+   Positive D: near = DS/(1 + D·DS), far = 1/D (lens at infinity).
+   Negative D shifts the whole range outward: the combo reaches infinity
+   focus while the lens is set to −1/D, so the far limit IS infinity —
+   provided that setting is within the lens's travel, i.e. the near-limit
+   denominator (1 + D·DS) is still positive. If it isn't, the diopter is
+   too strong for this lens and nothing real is in focus.
+   d === 0 means "no diopter": the native range, close focus → infinity
+   (the calculator filters zero strengths out; the explorer teaches them). */
+function focusLimits(d, cf, sub, addBack) {
+  if (d === 0) return { near: cf, far: Infinity, valid: true, invalidReason: null };
+  const ds = cf - sub; // DS at the lens's close focus
+  let near = null, far = null, invalidReason = null;
+  if (ds <= 0) {
+    invalidReason = 'close focus sits inside the diopter';
+  } else {
+    const denom = 1 + d * ds;
+    if (denom > 0) near = ds / denom + addBack;
+    else invalidReason = 'diopter too strong for this lens'; // only reachable when d < 0
+    far = d > 0 ? 1 / d + addBack : Infinity;
+  }
+  const valid = near !== null && near > 0 && far !== null && far > 0;
+  if (!valid && !invalidReason) invalidReason = 'out of range';
+  return { near, far, valid, invalidReason: valid ? null : invalidReason };
 }
 
 /* One derivation shared by the chart, results table, and CSV export. */
@@ -763,7 +910,7 @@ function csvField(value) {
 /* ==================== DOM / rendering ==================== */
 const el = id => document.getElementById(id);
 
-function setUnit(u) { state.unit = u; renderUnitDefaultNote(); renderOutputs(); refreshInputHints(); }
+function setUnit(u) { state.unit = u; renderUnitDefaultNote(); renderOutputs(); refreshInputHints(); renderBarrelTicks(); updateExplorer(); }
 function setReference(r) { state.reference = r; renderOutputs(); }
 
 /* ---------- theme ----------
@@ -793,6 +940,7 @@ function persistState() {
       reference: state.reference,
       gap: el('mountingGap').value,
       diopters: state.diopters.map(dp => ({ power: dp.power, thickness: dp.thickness })),
+      explorer: { D: exState.D, cf: exState.cf, lensLen: exState.lensLen, gap: exState.gap, thickness: exState.thickness, mount: exState.mount },
       lenses: state.lenses.map(l => ({ name: l.name, cf: l.cf, lensLen: l.lensLen, mount: l.mount || '', mountCustom: l.mountCustom || '' }))
     }));
   } catch (e) { /* storage full or blocked — keep working without persistence */ }
@@ -820,6 +968,16 @@ function loadPersistedState() {
         mount: ['PL', 'LPL', 'PV', 'custom'].includes(l.mount) ? l.mount : '',
         mountCustom: String(l.mountCustom || '')
       }));
+  }
+  if (s.explorer && typeof s.explorer === 'object') {
+    const ex = s.explorer;
+    const num = (v, lo, hi) => typeof v === 'number' && isFinite(v) && v >= lo && v <= hi;
+    if (num(ex.D, -2, 4)) exState.D = ex.D;
+    if (num(ex.cf, 0.2, 2.5)) exState.cf = ex.cf;
+    if (num(ex.lensLen, 0.05, 0.3)) exState.lensLen = ex.lensLen;
+    if (num(ex.gap, 0, 0.15)) exState.gap = ex.gap;
+    if (num(ex.thickness, 0, 0.02)) exState.thickness = ex.thickness;
+    if (['PL', 'LPL', 'PV'].includes(ex.mount)) exState.mount = ex.mount;
   }
   const u = document.querySelector(`input[name="unit"][value="${state.unit}"]`);
   if (u) u.checked = true;
@@ -957,7 +1115,7 @@ function renderLensTable() {
       <td><input type="text" class="narrow dist" data-field="cf" value="${escapeAttr(l.cf)}" placeholder="e.g. 2' 6&quot;"></td>
       <td><input type="text" class="narrow dist" data-field="lensLen" value="${escapeAttr(l.lensLen)}" placeholder="e.g. 0.2m"></td>
       <td><select data-field="mount"><option value=""${mount === '' ? ' selected' : ''}>—</option>${mountOptions}</select>${customField ? '<br>' + customField : ''}</td>
-      <td>${i > 0 ? `<button class="mv" data-act="mv" data-dir="-1" title="Move up" aria-label="Move up">▲</button>` : ''}${i < last ? `<button class="mv" data-act="mv" data-dir="1" title="Move down" aria-label="Move down">▼</button>` : ''}<button class="rm" data-act="rm">delete</button></td>
+      <td><button class="mv" data-act="mv" data-dir="-1" title="Move up" aria-label="Move up"${i > 0 ? '' : ' disabled'}>▲</button><button class="mv" data-act="mv" data-dir="1" title="Move down" aria-label="Move down"${i < last ? '' : ' disabled'}>▼</button><button class="rm" data-act="rm">delete</button></td>
     </tr>`;
   }).join('');
   refreshInputHints();
@@ -1725,9 +1883,262 @@ function bindEvents() {
     if (!btn) return;
     const id = rowId(btn);
     if (id === null) return;
+    if (btn.disabled) return;
     if (btn.dataset.act === 'rm') removeLens(id);
     else if (btn.dataset.act === 'mv') moveLens(id, Number(btn.dataset.dir));
   });
+}
+
+/* ==================== Explorer: drag playground ====================
+   Numeric state of its own, persisted inside the main blob under
+   "explorer". Physics comes from the same focusLimits() the tables use.
+   Follows the app's unit and theme controls; metric distances here read
+   in cm. */
+const exState = { D: 1, cf: 0.6, lensLen: 0.150, gap: 0.025, thickness: 0.006, mount: 'PL' };
+
+function exCm(m) {
+  if (m === Infinity) return '∞';
+  const cm = Math.round(m * 1000) / 10; // 1mm resolution
+  return `${Number.isInteger(cm) ? cm : cm.toFixed(1)} cm`;
+}
+function exFmt(m) {
+  if (m === null || m === undefined) return '—';
+  return state.unit === 'ft' ? fmtUnit(m, 'ft') : exCm(m);
+}
+function exAlt(m) { return state.unit === 'ft' ? exCm(m) : fmtUnit(m, 'ft'); }
+function exMm(m) { return `${Math.round(m * 10000) / 10}mm`; }
+/* Short barrel-style tick label: 9", 1', 1'6", 2' ... */
+function fmtBarrelFt(m) {
+  const totalInches = Math.round((m / M_PER_FT) * 12);
+  const feet = Math.floor(totalInches / 12);
+  const inches = totalInches - feet * 12;
+  if (feet === 0) return `${inches}"`;
+  if (inches === 0) return `${feet}'`;
+  return `${feet}'${inches}"`;
+}
+
+/* ---- scene geometry: one true axis ----
+   Symlog scale from the film plane (x=X0): LINEAR out to T_LIN metres, so
+   the hardware sits at true, proportional positions; LOGARITHMIC from T_LIN
+   to DMAX beyond, like a focus barrel; a reserved slot for infinity.
+   The two pieces are continuous at T_LIN. Hardware always fits inside the
+   linear zone (flange + lens + gap + glass maxes out around 0.53 m). */
+const EX_CY = 110;
+const X0 = 60, XT = 320, X1 = 690, INF_X = 715;
+const T_LIN = 0.6, DMAX = 10;
+const PX_M = (XT - X0) / T_LIN; // px per metre in the linear zone (true scale)
+const xFromDist = m => {
+  if (!isFinite(m)) return INF_X;
+  if (m <= T_LIN) return X0 + Math.max(0, m) * PX_M;
+  return XT + (Math.log(Math.min(DMAX, m) / T_LIN) / Math.log(DMAX / T_LIN)) * (X1 - XT);
+};
+const distFromX = x => x <= XT
+  ? Math.max(0, (x - X0) / PX_M)
+  : T_LIN * Math.pow(DMAX / T_LIN, (x - XT) / (X1 - XT));
+
+const TICKS_M = [0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 1, 1.5, 2, 3, 5, 7, 10];
+const TICKS_FT_M = [0.1524, 0.3048, 0.4572, 0.6096, 0.9144, 1.2192, 1.524, 2.1336, 3.048, 4.572, 6.096, 9.144];
+
+function renderBarrelTicks() {
+  const g = el('barrelTicks');
+  const list = state.unit === 'ft' ? TICKS_FT_M : TICKS_M;
+  let html = '';
+  list.filter(m => m > 0 && m <= DMAX).forEach(m => {
+    const x = xFromDist(m);
+    const label = state.unit === 'ft' ? fmtBarrelFt(m) : String(Math.round(m * 100));
+    html += `<line x1="${x}" y1="106" x2="${x}" y2="114" stroke="var(--line-strong)" stroke-width="1"/>`;
+    html += `<text x="${x}" y="128" text-anchor="middle" font-size="8.5" fill="var(--steel)">${label}</text>`;
+  });
+  html += `<text x="${INF_X}" y="115" text-anchor="middle" font-size="13" fill="var(--steel)">∞</text>`;
+  g.innerHTML = html;
+  el('barrelCaption').textContent = 'Distance from film plane (\u03d5)' + (state.unit === 'm' ? ' \u2014 cm' : '');
+}
+
+/* CF label above the marker shows the live value; whole-inch values use
+   the compact barrel style. */
+function cfLabelText() {
+  if (state.unit === 'ft') {
+    const inches = exState.cf / 0.0254;
+    if (Math.abs(inches - Math.round(inches)) < 0.02) return `CF ${fmtBarrelFt(exState.cf)} \u2194`;
+  }
+  return `CF ${exFmt(exState.cf)} \u2194`;
+}
+
+function updateExplorer() {
+  const flange = MOUNT_FLANGE[exState.mount];
+  const sub = exState.gap + exState.lensLen + flange + exState.thickness / 2;
+  const lim = focusLimits(exState.D, exState.cf, sub, sub);
+  const ds = exState.cf - sub;
+  const mode = !lim.valid ? 'invalid' : exState.D === 0 ? 'none' : exState.D > 0 ? 'pos' : 'neg';
+
+  /* hardware at true axis positions */
+  const mountX = X0 + flange * PX_M;
+  const frontX = X0 + (flange + exState.lensLen) * PX_M;
+  const dioFrontX = X0 + (flange + exState.lensLen + exState.gap) * PX_M;
+  const rx = Math.max(3.5, (exState.thickness / 2) * PX_M); // min size keeps thin glass grabbable
+  const dioCX = dioFrontX + rx;
+
+  el('camBody').setAttribute('x', mountX - 52);
+  el('mountBar').setAttribute('x1', mountX); el('mountBar').setAttribute('x2', mountX);
+  el('mountLabel').setAttribute('x', mountX);
+  el('flangeDim').setAttribute('x2', mountX);
+  el('flangeTickB').setAttribute('x1', mountX); el('flangeTickB').setAttribute('x2', mountX);
+  el('flangeLabel').setAttribute('x', (X0 + mountX) / 2);
+  el('lensBody').setAttribute('d', `M ${mountX},${EX_CY - 12} L ${frontX},${EX_CY - 24} L ${frontX},${EX_CY + 24} L ${mountX},${EX_CY + 12} Z`);
+  el('frontEdge').setAttribute('x1', frontX); el('frontEdge').setAttribute('x2', frontX);
+  el('frontHit').setAttribute('x', frontX - 10);
+  el('diopterGlass').setAttribute('cx', dioCX); el('diopterGlass').setAttribute('rx', rx);
+  el('diopterHit').setAttribute('x', dioCX - 13);
+  el('dioTag').setAttribute('x', dioCX);
+
+  el('dimLenA').setAttribute('x1', mountX); el('dimLenA').setAttribute('x2', frontX);
+  el('dimLenS').setAttribute('x1', mountX); el('dimLenS').setAttribute('x2', mountX);
+  el('dimLenB').setAttribute('x1', frontX); el('dimLenB').setAttribute('x2', frontX);
+  el('dimLenText').setAttribute('x', (mountX + frontX) / 2);
+  el('dimLenText').textContent = `Lens length ${exMm(exState.lensLen)}`;
+  el('dimGapA').setAttribute('x1', frontX); el('dimGapA').setAttribute('x2', dioFrontX);
+  el('dimGapB').setAttribute('x1', frontX); el('dimGapB').setAttribute('x2', frontX);
+  el('dimGapC').setAttribute('x1', dioFrontX); el('dimGapC').setAttribute('x2', dioFrontX);
+  el('dimGapText').setAttribute('x', (frontX + dioFrontX) / 2 + 2);
+  el('dimGapText').textContent = `gap ${exMm(exState.gap)}`;
+  el('flangeLabel').textContent = `${exState.mount} ${exMm(flange)}`;
+
+  /* CF marker + live value */
+  const cfX = xFromDist(exState.cf);
+  el('cfMark').setAttribute('x1', cfX); el('cfMark').setAttribute('x2', cfX);
+  el('cfHit').setAttribute('x', cfX - 9);
+  el('cfLabel').setAttribute('x', cfX);
+  el('cfLabel').textContent = cfLabelText();
+
+  /* focus band */
+  const band = el('band'), arrow = el('bandArrow'), bn = el('bandNote');
+  const nearL = el('nearLabel'), farL = el('farLabel');
+  if (!lim.valid) {
+    band.setAttribute('width', 0); arrow.setAttribute('d', '');
+    nearL.textContent = ''; farL.textContent = '';
+    bn.textContent = lim.invalidReason;
+  } else {
+    bn.textContent = mode === 'none' ? 'no diopter — the lens\u2019s native range' : '';
+    const color = mode === 'neg' ? 'var(--diopter-blue)' : mode === 'none' ? 'var(--steel)' : 'var(--warn-red)';
+    const x1 = xFromDist(lim.near);
+    const x2 = isFinite(lim.far) ? xFromDist(lim.far) : X1 + 14;
+    band.setAttribute('x', x1); band.setAttribute('width', Math.max(2, x2 - x1)); band.setAttribute('fill', color);
+    if (isFinite(lim.far)) arrow.setAttribute('d', '');
+    else { arrow.setAttribute('d', `M ${x2},${EX_CY - 8} L ${x2 + 8},${EX_CY} L ${x2},${EX_CY + 8} Z`); arrow.setAttribute('fill', color); }
+    nearL.setAttribute('x', x1); nearL.textContent = exFmt(lim.near);
+    farL.setAttribute('x', isFinite(lim.far) ? x2 : INF_X); farL.textContent = exFmt(lim.far);
+  }
+
+  /* readouts */
+  setExStat('statNear', lim.valid ? exFmt(lim.near) : lim.invalidReason, lim.valid ? exAlt(lim.near) : '', !lim.valid);
+  setExStat('statFar', lim.valid ? exFmt(lim.far) : '—', lim.valid && isFinite(lim.far) ? exAlt(lim.far) : '', false);
+  const range = lim.valid ? Math.abs(lim.far - lim.near) : null;
+  setExStat('statRange', lim.valid ? exFmt(range) : '—', lim.valid && isFinite(range) ? exAlt(range) : '', false);
+  el('statSub').textContent = `Film plane → diopter centre: ${exMm(sub)} (${exFmt(sub)}) · DS at close focus: ${ds > 0 ? exFmt(ds) : '—'}`;
+
+  /* control readouts */
+  el('outD').textContent = exState.D === 0 ? 'none' : (exState.D > 0 ? `+${exState.D}` : `${exState.D}`);
+  el('outCF').textContent = exFmt(exState.cf);
+  el('outLen').textContent = exMm(exState.lensLen);
+  el('outGap').textContent = exMm(exState.gap);
+  el('outThk').textContent = exMm(exState.thickness);
+  el('outMount').textContent = exMm(flange);
+
+  /* live maths */
+  el('mathSub').textContent = `sub = flange + lens length + gap + ½ glass  =  ${exMm(flange)} + ${exMm(exState.lensLen)} + ${exMm(exState.gap)} + ${exMm(exState.thickness / 2)}  =  ${exMm(sub)}`;
+  el('mathDS').textContent = `DS  = close focus − sub  =  ${exFmt(exState.cf)} − ${exMm(sub)}  =  ${ds > 0 ? exFmt(ds) : '— (' + (lim.invalidReason || 'n/a') + ')'}`;
+  if (lim.valid && mode !== 'none') {
+    el('mathNear').textContent = `near = DS ÷ (1 + D × DS) + sub  =  ${ds.toFixed(3)} ÷ (1 + ${exState.D} × ${ds.toFixed(3)}) + ${exMm(sub)}  =  ${exFmt(lim.near)}`;
+    el('mathFar').textContent = mode === 'pos'
+      ? `far  = 1 ÷ D + sub  =  1 ÷ ${exState.D} + ${exMm(sub)}  =  ${exFmt(lim.far)}`
+      : `far  = ∞  (negative diopter — the lens reaches infinity at DS = −1 ÷ ${exState.D} = ${exFmt(-1 / exState.D)})`;
+  } else if (mode === 'none') {
+    el('mathNear').textContent = `near = close focus  =  ${exFmt(exState.cf)}  (no diopter fitted)`;
+    el('mathFar').textContent = `far  = ∞  (no diopter fitted)`;
+  } else {
+    el('mathNear').textContent = `near = —  (${lim.invalidReason})`;
+    el('mathFar').textContent = `far  = —`;
+  }
+
+  persistState();
+}
+
+function setExStat(id, v, alt, bad) {
+  const box = el(id);
+  box.classList.toggle('bad', !!bad);
+  box.querySelector('.v').textContent = v;
+  box.querySelector('.alt').textContent = alt;
+}
+
+function syncExplorerSliders() {
+  el('inD').value = exState.D;
+  el('inCF').value = exState.cf;
+  el('inLen').value = Math.round(exState.lensLen * 1000);
+  el('inGap').value = Math.round(exState.gap * 1000);
+  el('inThk').value = exState.thickness * 1000;
+  el('inMount').value = exState.mount;
+}
+
+function bindExplorer() {
+  el('inD').addEventListener('input', e => { exState.D = parseFloat(e.target.value); updateExplorer(); });
+  el('inCF').addEventListener('input', e => { exState.cf = parseFloat(e.target.value); updateExplorer(); });
+  el('inLen').addEventListener('input', e => { exState.lensLen = parseFloat(e.target.value) / 1000; updateExplorer(); });
+  el('inGap').addEventListener('input', e => { exState.gap = parseFloat(e.target.value) / 1000; updateExplorer(); });
+  el('inThk').addEventListener('input', e => { exState.thickness = parseFloat(e.target.value) / 1000; updateExplorer(); });
+  el('inMount').addEventListener('change', e => { exState.mount = e.target.value; updateExplorer(); });
+  document.querySelectorAll('.presets button[data-d]').forEach(b => b.addEventListener('click', () => {
+    exState.D = parseFloat(b.dataset.d);
+    // Match the strength against the main diopter table: if that exact
+    // power exists there, borrow its glass thickness; otherwise 0.
+    const match = state.diopters.find(dp => dp.power === exState.D);
+    exState.thickness = match ? diopterThicknessMeters(match) : 0;
+    syncExplorerSliders(); updateExplorer();
+  }));
+  el('btnJumpExplorer').addEventListener('click', () => {
+    const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el('explorer').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' });
+  });
+
+  /* ---- direct dragging ----
+     pointerdown on a handle starts a drag; move/up listen on the window so
+     fast drags can't escape. Client px convert to viewBox px via the svg's
+     rendered width (guarded for environments with no layout). While
+     dragging, close focus snaps to whole inches (ft) or whole cm (metric). */
+  const svg = el('scene');
+  let drag = null; // { kind, startClientX, startVal }
+  const viewScale = () => {
+    const w = svg.getBoundingClientRect().width;
+    return w > 0 ? 760 / w : 1;
+  };
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const start = (kind, getVal) => e => {
+    drag = { kind, startClientX: e.clientX, startVal: getVal() };
+    if (e.pointerId !== undefined && svg.setPointerCapture) { try { svg.setPointerCapture(e.pointerId); } catch (err) {} }
+    e.preventDefault();
+  };
+  const onMove = e => {
+    if (!drag) return;
+    const dxView = (e.clientX - drag.startClientX) * viewScale();
+    if (drag.kind === 'front') exState.lensLen = clamp(drag.startVal + dxView / PX_M, 0.05, 0.3);
+    else if (drag.kind === 'diopter') exState.gap = clamp(drag.startVal + dxView / PX_M, 0, 0.15);
+    else if (drag.kind === 'cf') {
+      const startX = xFromDist(drag.startVal);
+      let raw = distFromX(startX + dxView);
+      raw = state.unit === 'ft' ? Math.round(raw / 0.0254) * 0.0254 : Math.round(raw * 100) / 100;
+      exState.cf = clamp(raw, 0.2, 2.5);
+    }
+    syncExplorerSliders(); updateExplorer();
+    e.preventDefault();
+  };
+  const onUp = () => { drag = null; };
+  [['lensBody', 'front'], ['frontEdge', 'front'], ['frontHit', 'front'], ['diopterGlass', 'diopter'], ['diopterHit', 'diopter'], ['cfMark', 'cf'], ['cfHit', 'cf']]
+    .forEach(([id, kind]) => {
+      const getVal = kind === 'front' ? () => exState.lensLen : kind === 'diopter' ? () => exState.gap : () => exState.cf;
+      el(id).addEventListener('pointerdown', start(kind, getVal));
+    });
+  window.addEventListener('pointermove', onMove, { passive: false });
+  window.addEventListener('pointerup', onUp);
+  window.addEventListener('pointercancel', onUp);
 }
 
 /* ---------- init ---------- */
@@ -1744,6 +2155,10 @@ el('feedbackLink').href = `mailto:irwinsamj@gmail.com?subject=${feedbackSubject}
 renderDiopterTable();
 if (state.lenses.length) { renderLensTable(); renderOutputs(); }
 else addLens(); // first visit: start with one empty row for convenience
+bindExplorer();
+syncExplorerSliders();
+renderBarrelTicks();
+updateExplorer();
 </script>
 
 </body>
