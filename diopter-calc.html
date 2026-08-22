@@ -173,6 +173,10 @@ try {
      minimum width so its labels stay legible. */
   .table-scroll { overflow-x: auto; }
   #allLensesChartContainer { overflow-x: auto; }
+  /* Kept off-screen rather than display:none — hidden elements report a
+     zero-size getBBox(), which would silently skip the label-fitting pass
+     (long lens names would then overlap the CF marker when printed). */
+  #printChartContainer { position: absolute; left: -10000px; top: 0; width: 690px; pointer-events: none; }
   #allLensesChartContainer svg { min-width: 600px; }
   .note { font-size: 12px; color: var(--steel); }
   /* invalid rows are 'not applicable', not danger — steel keeps them
@@ -192,11 +196,39 @@ try {
   .inline-panel.warn { border-left-color: var(--warn-red); }
   .inline-panel.ok { border-left-color: var(--focus-green); }
   .inline-panel .spacer { flex: 1 1 auto; }
+  /* When the panel sits inline beside a button, let it take the rest of the row
+     rather than forcing an awkward narrow box. */
+  .toolbar > .inline-panel { flex: 1 1 320px; margin: 0; }
   .inline-note { font-size: 12px; color: var(--warn-red); font-style: italic; }
 
   /* ---- toolbars ---- */
   .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
   .toolbar .spacer { flex: 1 1 auto; }
+  /* Grouped controls with a leading label, so it's obvious which buttons
+     belong to saved sets and which to CSV files. */
+  .tool-group {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    margin: 8px 0; padding: 8px 10px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  }
+  .tool-group .tool-label {
+    font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.06em; color: var(--steel);
+    margin-right: 2px; white-space: nowrap;
+  }
+  /* The native file input can't be styled, so hide it inside a label that
+     looks like the other buttons. */
+  .filebtn {
+    display: inline-flex; align-items: center; cursor: pointer;
+    padding: 7px 13px; font-size: 13px; font-family: var(--font-sans); font-weight: 500;
+    border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink);
+    border-radius: var(--radius); margin: 0;
+    /* <button> defaults to line-height:normal; without this the label inherits
+       the page's larger line-height and ends up taller than its neighbours. */
+    line-height: normal;
+  }
+  .filebtn:hover { background: var(--paper); }
+  .filebtn input[type=file] { display: none; }
   .breakdown {
     background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
     padding: 12px 14px; margin-top: 12px; font-size: 13px;
@@ -248,13 +280,39 @@ try {
       --focus-green: #1a7a4c; --warn-red: #a3273a; --warn-soft: #f3dde1;
       --diopter-blue: #4c6b8a;
     }
-    body * { visibility: hidden; }
-    #printArea, #printArea * { visibility: visible; }
-    #printArea { position: absolute; top: 0; left: 0; width: 100%; }
+    /* Use display:none rather than visibility:hidden — visibility keeps the
+       hidden content's layout space, which padded the print job out with
+       blank pages. Collapsing it leaves only the graph. */
+    body > * { display: none !important; }
+    #resultsSection { display: block !important; }
+    #resultsSection > * { display: none !important; }
+    #resultsSection > #printArea { display: block !important; }
+    #printArea { position: static; width: 100%; }
     .no-print { display: none !important; }
-    #allLensesChartContainer { overflow: visible; }
-    #allLensesChartContainer svg { min-width: 0; }
+    /* Print uses the per-lens blocks instead of the single continuous graph,
+       so no lens can be sliced across a page boundary. */
+    #allLensesChartContainer { display: none !important; }
+    #printChartContainer {
+      display: block !important;
+      position: static !important; left: auto !important; top: auto !important; width: 100% !important;
+    }
+    .print-lens-block {
+      break-inside: avoid; page-break-inside: avoid;
+      overflow: visible;
+    }
+    .print-lens-block svg { min-width: 0; }
+    /* Running footer — position:fixed repeats on every printed page. */
+    #printFooter {
+      display: flex !important; justify-content: space-between; align-items: baseline; gap: 12px;
+      position: fixed; bottom: 0; left: 0; right: 0;
+      padding-top: 4px; border-top: 1px solid #ccc;
+      font-size: 8px; color: #666; background: #fff;
+    }
+    #printFooterMark { font-weight: bold; letter-spacing: 0.08em; white-space: nowrap; }
+    /* Keep the graph clear of the footer band. */
+    @page { margin: 12mm 10mm 16mm; }
   }
+  #printFooter { display: none; }
   @media (max-width: 620px) {
     .row { gap: 14px; }
     .lead { margin-left: 0; }
@@ -308,7 +366,7 @@ try {
 
     <div class="control">
       <div class="label">Mounting gap</div>
-      <input type="text" class="narrow" id="mountingGap" placeholder="e.g. 1&quot; or 3mm">
+      <input type="text" class="narrow dist" id="mountingGap" data-defunit="mm" inputmode="decimal" placeholder="e.g. 1&quot; or 3mm">
     </div>
   </div>
 
@@ -415,18 +473,28 @@ try {
   <div class="step-head"><span class="step-num">3</span><h2>Your lenses</h2></div>
   <p class="lead">Add each lens with its close focus and length. Load a saved set or import a CSV.</p>
 
-  <div class="toolbar">
+  <div class="tool-group">
+    <span class="tool-label">Saved sets</span>
     <select id="setSelect"></select>
-    <button id="btnLoadSet">Load set</button>
-    <button id="btnSaveSet">Save set…</button>
+    <button id="btnLoadSet">Load</button>
+    <button id="btnSaveSet">Save as…</button>
+    <button id="btnRenameSet">Rename</button>
     <button id="btnDeleteSet">Delete</button>
-    <span class="spacer"></span>
-    <button id="btnCSVTemplate">CSV template</button>
-    <label class="note" style="margin:0">Import CSV <input type="file" accept=".csv" id="csvImport"></label>
-    <button id="btnExportLenses">Export CSV</button>
   </div>
-  <p class="note" id="storageNote" style="margin:0 0 4px">Saved sets are stored in this browser only. Export CSV to send your current set to someone else — they can load it with Import CSV.</p>
-  <div class="inline-panel no-print" id="setPanel" hidden></div>
+
+  <div class="tool-group">
+    <span class="tool-label">CSV file</span>
+    <label class="filebtn">Import<input type="file" accept=".csv" id="csvImport"></label>
+    <button id="btnExportLenses">Export</button>
+    <button id="btnCSVTemplate">Template</button>
+  </div>
+
+  <p class="note" id="storageNote" style="margin:0 0 4px">Saved sets are stored in this browser only. Export a CSV to send your current set to someone else — they can load it with Import.</p>
+
+  <div class="toolbar" style="margin-bottom:6px">
+    <button id="btnClearLenses">Clear lens table</button>
+    <div class="inline-panel no-print" id="setPanel" hidden></div>
+  </div>
 
   <div class="table-scroll">
   <table id="lensTable">
@@ -441,7 +509,7 @@ try {
     </thead>
     <tbody></tbody>
     <tfoot>
-      <tr class="add-row"><td colspan="5"><button id="btnAddLens">+ Add lens</button></td></tr>
+      <tr class="add-row"><td colspan="5"><button id="btnAddLens">+ Add lens</button> <button id="btnUndoDelete" disabled>Undo delete</button></td></tr>
     </tfoot>
   </table>
   </div>
@@ -458,7 +526,7 @@ try {
 </section>
 
 <!-- ============ RESULTS ============ -->
-<section>
+<section id="resultsSection">
   <div class="step-head"><span class="step-num">✓</span><h2>Results</h2></div>
 
   <div id="printArea">
@@ -469,6 +537,11 @@ try {
       <span class="inline-note" id="chartNote" hidden></span>
     </div>
     <div id="allLensesChartContainer"></div>
+    <div id="printChartContainer"></div>
+    <div id="printFooter" aria-hidden="true">
+      <span id="printFooterContext"></span>
+      <span id="printFooterMark"></span>
+    </div>
   </div>
 
   <div class="table-scroll">
@@ -616,7 +689,7 @@ try {
 <script>
 'use strict';
 // [pure-core-start]
-const APP_VERSION = 'v23'; // bump this on every revision — shown under the title
+const APP_VERSION = 'v26'; // bump this on every revision — shown under the title
 const M_PER_FT = 0.3048;
 
 /* Flange focal depth by mount type — the fixed distance from the mount's contact
@@ -626,7 +699,7 @@ const M_PER_FT = 0.3048;
 const MOUNT_FLANGE = { PL: 0.052, LPL: 0.044, PV: 0.05715 };
 function flangeDepth(lens) {
   if (lens.mount === 'custom') {
-    const v = parseDistance(lens.mountCustom);
+    const v = parseDistance(lens.mountCustom, 'mm');
     return isNaN(v) ? NaN : v;
   }
   return MOUNT_FLANGE[lens.mount] !== undefined ? MOUNT_FLANGE[lens.mount] : NaN;
@@ -651,7 +724,15 @@ const state = {
    ' and " => feet/inches (either or both; "5'6" reads as 5' 6").
    mm => millimetres. cm => centimetres. m => metres.
    Bare number (no symbol) => feet in ft mode, centimetres in metric mode. */
-function parseDistance(raw) {
+/* Multipliers to metres for each unit a field can default to. */
+const UNIT_FACTOR = { in: 0.0254, ft: M_PER_FT, mm: 0.001, cm: 0.01, m: 1 };
+
+/* parseDistance(raw, defaultUnit)
+   defaultUnit (optional) sets what a BARE number means for that specific field
+   — e.g. close focus defaults to inches, lens length to mm — because those are
+   the units each is naturally quoted in. Explicitly typed units always win.
+   With no defaultUnit, falls back to the global units setting. */
+function parseDistance(raw, defaultUnit) {
   if (raw === null || raw === undefined) return NaN;
   // Spreadsheets and word processors autocorrect straight quotes to curly ones,
   // and some sources use true prime marks — normalise them all first.
@@ -680,7 +761,9 @@ function parseDistance(raw) {
   if (meterMatch) return parseFloat(meterMatch[1]);
   const num = parseFloat(str);
   if (isNaN(num)) return NaN;
-  // Bare number with no unit symbol: feet in ft mode, centimetres in metric mode.
+  // Bare number with no unit symbol: use the field's own default if it has one,
+  // otherwise feet in ft mode / centimetres in metric mode.
+  if (defaultUnit && UNIT_FACTOR[defaultUnit]) return num * UNIT_FACTOR[defaultUnit];
   return state.unit === 'ft' ? num * M_PER_FT : num / 100;
 }
 
@@ -729,7 +812,7 @@ function diopterLabel(power) { return power > 0 ? `+${power}` : `${power}`; }
 
 /* A diopter's glass thickness in meters (blank => 0, no correction). */
 function diopterThicknessMeters(dp) {
-  const v = parseDistance(dp.thickness);
+  const v = parseDistance(dp.thickness, 'mm');
   return isNaN(v) ? 0 : v;
 }
 
@@ -749,8 +832,8 @@ function diopterThicknessMeters(dp) {
    Lens length + flange are required for film-plane mode; in diopter mode they're
    optional but used when present. Thickness is optional; blank => zero. */
 function computeLensData(lens, gap, reference) {
-  const cf = parseDistance(lens.cf);
-  const lensLen = parseDistance(lens.lensLen);
+  const cf = parseDistance(lens.cf, 'in');
+  const lensLen = parseDistance(lens.lensLen, 'mm');
   const flange = flangeDepth(lens);
   const backToPlane = (isNaN(lensLen) ? 0 : lensLen) + (isNaN(flange) ? 0 : flange);
   const hasBackToPlane = !isNaN(lensLen) && !isNaN(flange);
@@ -811,7 +894,7 @@ function focusLimits(d, cf, sub, addBack) {
 
 /* One derivation shared by the chart, results table, and CSV export. */
 function derive(gapRaw) {
-  const gapParsed = parseDistance(gapRaw);
+  const gapParsed = parseDistance(gapRaw, 'mm');
   const gap = isNaN(gapParsed) ? 0 : gapParsed;
   const reference = state.reference;
   const lensData = state.lenses
@@ -885,7 +968,11 @@ function parseCSV(text) {
         else inQuotes = false;
       } else field += ch;
     } else {
-      if (ch === '"') inQuotes = true;
+      // A double quote only opens a quoted field at the very START of a field.
+      // Anywhere else it's a literal inch mark — hand-written CSVs routinely
+      // contain unquoted values like 14", and treating those as an opening
+      // quote silently swallows the following rows.
+      if (ch === '"' && field === '') inQuotes = true;
       else if (ch === ',') { row.push(field); field = ''; }
       else if (ch === '\n' || ch === '\r') {
         if (ch === '\r' && text[i + 1] === '\n') i++;
@@ -984,16 +1071,15 @@ function loadPersistedState() {
 }
 function renderUnitDefaultNote() {
   const n = el('unitDefaultNote');
-  if (n) n.textContent = state.unit === 'ft'
-    ? 'A number typed with no unit is read as feet.'
-    : 'A number typed with no unit is read as cm.';
+  if (n) n.textContent = 'Typed with no unit: close focus reads as inches, lens length and gaps as mm.';
 }
 
-/* Distance inputs: red outline while unparseable, tooltip shows the interpreted value. */
+/* Distance inputs: red outline while unparseable, tooltip shows the interpreted value.
+   data-defunit lets a field declare what a bare number means (see parseDistance). */
 function styleDistanceInput(input) {
   const raw = input.value.trim();
   if (raw === '') { input.classList.remove('bad'); input.title = ''; return; }
-  const parsed = parseDistance(raw);
+  const parsed = parseDistance(raw, input.dataset.defunit);
   if (isNaN(parsed)) { input.classList.add('bad'); input.title = 'Not recognised as a distance'; }
   else { input.classList.remove('bad'); input.title = 'Reads as ' + fmt(parsed); }
 }
@@ -1009,8 +1095,8 @@ function refreshInputHints() {
 function renderDiopterTable() {
   document.querySelector('#diopterTable tbody').innerHTML = state.diopters.map(dp => `
     <tr data-id="${dp.id}">
-      <td><input type="text" class="narrow num" data-field="power" value="${dp.power === null || dp.power === undefined ? '' : escapeAttr(String(dp.power))}" placeholder="e.g. +1.5 or -0.5"></td>
-      <td><input type="text" class="narrow dist" data-field="thickness" value="${escapeAttr(dp.thickness || '')}" placeholder="e.g. 15mm (optional)"></td>
+      <td><input type="text" class="narrow num" data-field="power" inputmode="text" value="${dp.power === null || dp.power === undefined ? '' : escapeAttr(String(dp.power))}" placeholder="e.g. +1.5 or -0.5"></td>
+      <td><input type="text" class="narrow dist" data-field="thickness" data-defunit="mm" inputmode="decimal" value="${escapeAttr(dp.thickness || '')}" placeholder="e.g. 15mm (optional)"></td>
       <td><button class="rm" data-act="rm">delete</button></td>
     </tr>`).join('');
   refreshInputHints();
@@ -1069,18 +1155,95 @@ function removeDiopter(id) {
 /* ---------- lens set ----------
    The table is only rebuilt on structural changes (add/remove/import/load) so
    typing never loses focus; per-keystroke edits update state + outputs only. */
-function addLens() {
+function addLens(focusNew) {
   const prev = state.lenses[state.lenses.length - 1];
   const mount = prev ? (prev.mount || '') : '';
   const mountCustom = prev ? (prev.mountCustom || '') : '';
-  state.lenses.push({ id: state.nextId++, name: '', cf: '', lensLen: '', mount, mountCustom });
+  const id = state.nextId++;
+  state.lenses.push({ id, name: '', cf: '', lensLen: '', mount, mountCustom });
   renderLensTable();
   renderOutputs();
+  // Focus the new row's name field so the keyboard opens straight away on mobile.
+  // Only on an explicit user add — never on the init-seeded first row, which
+  // would otherwise pop the keyboard the moment the page loads.
+  if (focusNew) {
+    const row = document.querySelector(`#lensTable tbody tr[data-id="${id}"] input.lens-name`);
+    if (row) row.focus();
+  }
 }
-function removeLens(id) {
-  state.lenses = state.lenses.filter(l => l.id !== id);
+/* Undo history for lens deletion — a LIFO stack, most recent first.
+   Deliberately NOT part of `state` (and so never written to localStorage):
+   deletions are recoverable for the current session only. */
+const UNDO_LIMIT = 30;
+let undoStack = [];
+function pushUndo(entry) {
+  undoStack.push(entry);
+  if (undoStack.length > UNDO_LIMIT) undoStack.shift(); // drop the oldest
+  refreshUndoButton();
+}
+function refreshUndoButton() {
+  const b = el('btnUndoDelete');
+  if (!b) return;
+  const n = undoStack.length;
+  b.disabled = n === 0;
+  b.textContent = n ? `Undo delete (${n})` : 'Undo delete';
+  b.title = n ? 'Restore the most recently deleted lens or lenses' : 'Nothing to restore';
+}
+function offerUndoRemove() {
+  const top = undoStack[undoStack.length - 1];
+  if (!top) return;
+  const n = top.lenses.length;
+  const what = top.kind === 'all'
+    ? `Cleared ${n} ${n === 1 ? 'lens' : 'lenses'}.`
+    : `Deleted “${escapeText(top.lenses[0].name || 'unnamed lens')}”.`;
+  panelConfirm(what, [{ label: 'Undo', act: 'undo-remove', primary: true }]);
+}
+function undoRemove() {
+  const entry = undoStack.pop();
+  if (!entry) { setPanelNote('Nothing left to restore.', 'warn'); return; }
+  if (entry.kind === 'all') {
+    // Put the cleared lenses back, keeping anything added since.
+    state.lenses = entry.lenses.concat(state.lenses);
+  } else {
+    state.lenses.splice(Math.min(entry.index, state.lenses.length), 0, entry.lenses[0]);
+  }
+  refreshUndoButton();
   renderLensTable();
   renderOutputs();
+  const left = undoStack.length;
+  const n = entry.lenses.length;
+  const msg = entry.kind === 'all'
+    ? `Restored ${n} ${n === 1 ? 'lens' : 'lenses'}.`
+    : `Restored “${entry.lenses[0].name || 'unnamed lens'}”.`;
+  if (left > 0) {
+    panelConfirm(`${escapeText(msg)} ${left} more can be undone.`, [{ label: 'Undo again', act: 'undo-remove', primary: true }]);
+  } else {
+    setPanelNote(msg, 'ok');
+  }
+}
+
+function removeLens(id) {
+  const idx = state.lenses.findIndex(l => l.id === id);
+  if (idx === -1) return;
+  pushUndo({ lenses: [state.lenses[idx]], index: idx, kind: 'one' });
+  state.lenses.splice(idx, 1);
+  renderLensTable();
+  renderOutputs();
+  offerUndoRemove();
+}
+
+function clearAllLenses() {
+  if (state.lenses.length === 0) { setPanelNote('There are no lenses to clear.', 'warn'); return; }
+  const n = state.lenses.length;
+  panelConfirm(`Clear all ${n} ${n === 1 ? 'lens' : 'lenses'} from the set?`,
+    [{ label: 'Clear all', act: 'clear-do', primary: true }]);
+}
+function commitClearLenses() {
+  pushUndo({ lenses: state.lenses.slice(), index: 0, kind: 'all' });
+  state.lenses = [];
+  renderLensTable();
+  renderOutputs();
+  offerUndoRemove();
 }
 function moveLens(id, dir) {
   const i = state.lenses.findIndex(l => l.id === id);
@@ -1105,13 +1268,13 @@ function renderLensTable() {
       `<option value="${m}"${mount === m ? ' selected' : ''}>${m === 'custom' ? 'Custom…' : m}</option>`
     ).join('');
     const customField = mount === 'custom'
-      ? `<input type="text" class="dist" data-field="mountCustom" style="width:70px;margin-top:3px" value="${escapeAttr(l.mountCustom || '')}" placeholder="flange, e.g. 40mm as 0.04m">`
+      ? `<input type="text" class="dist" data-field="mountCustom" data-defunit="mm" inputmode="decimal" style="width:70px;margin-top:3px" value="${escapeAttr(l.mountCustom || '')}" placeholder="flange, e.g. 40mm">`
       : '';
     return `
     <tr data-id="${l.id}">
-      <td><input type="text" class="narrow" data-field="name" value="${escapeAttr(l.name)}" placeholder="e.g. 35mm Master Prime"></td>
-      <td><input type="text" class="narrow dist" data-field="cf" value="${escapeAttr(l.cf)}" placeholder="e.g. 2' 6&quot;"></td>
-      <td><input type="text" class="narrow dist" data-field="lensLen" value="${escapeAttr(l.lensLen)}" placeholder="e.g. 0.2m"></td>
+      <td><input type="text" class="narrow lens-name" data-field="name" value="${escapeAttr(l.name)}" placeholder="e.g. 35mm Master Prime"></td>
+      <td><input type="text" class="narrow dist" data-field="cf" data-defunit="in" inputmode="decimal" value="${escapeAttr(l.cf)}" placeholder="e.g. 18&quot;"></td>
+      <td><input type="text" class="narrow dist" data-field="lensLen" data-defunit="mm" inputmode="decimal" value="${escapeAttr(l.lensLen)}" placeholder="e.g. 200mm"></td>
       <td><select data-field="mount"><option value=""${mount === '' ? ' selected' : ''}>—</option>${mountOptions}</select>${customField ? '<br>' + customField : ''}</td>
       <td><button class="mv" data-act="mv" data-dir="-1" title="Move up" aria-label="Move up"${i > 0 ? '' : ' disabled'}>▲</button><button class="mv" data-act="mv" data-dir="1" title="Move down" aria-label="Move down"${i < last ? '' : ' disabled'}>▼</button><button class="rm" data-act="rm">delete</button></td>
     </tr>`;
@@ -1277,14 +1440,42 @@ function refreshSetSelect(selectName) {
   select.innerHTML = builtInHtml + savedHtml;
   if (selectName && (builtInNames.includes(selectName) || savedNames.includes(selectName))) select.value = selectName;
 }
+/* The last set name loaded or saved this session — used to pre-fill the save
+   box so re-saving a tweaked set is one tap. Session-only, not persisted. */
+let lastSetName = '';
+
+/* Returns a name that doesn't clash with an existing saved set or built-in
+   preset, by appending / incrementing a trailing number: "My Set" ->
+   "My Set 2" -> "My Set 3". Returns `base` unchanged if it's already free. */
+function uniqueSetName(base) {
+  const taken = n => Boolean(BUILT_IN_SETS[n]) || Boolean(readStore()[n]);
+  const trimmed = (base || '').trim() || 'Lens set';
+  if (!taken(trimmed)) return trimmed;
+  // Split any trailing number off so "Primes 2" increments rather than
+  // becoming "Primes 2 2".
+  const m = trimmed.match(/^(.*?)\s+(\d+)$/);
+  const stem = m ? m[1] : trimmed;
+  let n = m ? parseInt(m[2], 10) : 1;
+  while (taken(`${stem} ${++n}`) && n < 999);
+  return `${stem} ${n}`;
+}
+
 function saveCurrentSet() {
   if (state.lenses.length === 0) { setPanelNote('Add some lenses first.', 'warn'); return; }
+  // Pre-fill with the last set worked on, numbered up if that name is taken,
+  // so the common "save a variation" case needs no typing.
+  const suggested = lastSetName ? uniqueSetName(lastSetName) : '';
+  openSaveSetPanel(suggested);
+}
+function openSaveSetPanel(prefill, noteHtml) {
   setPanel(`<label for="setNameInput" style="margin:0">Name this lens set</label>` +
-    `<input type="text" id="setNameInput" class="narrow">` +
+    `<input type="text" id="setNameInput" class="narrow" value="${escapeAttr(prefill || '')}">` +
     `<button class="primary" data-act="save-do">Save</button>` +
     `<button data-act="panel-cancel">Cancel</button>` +
-    `<span class="inline-note" id="setNameErr"></span>`);
-  el('setNameInput').focus();
+    `<span class="inline-note" id="setNameErr">${noteHtml || ''}</span>`);
+  const inp = el('setNameInput');
+  inp.focus();
+  inp.select(); // whole suggestion selected, so typing replaces it outright
 }
 function trySaveSet() {
   const inp = el('setNameInput');
@@ -1302,8 +1493,13 @@ function trySaveSet() {
 }
 function commitSaveSet(name) {
   const sets = readStore();
-  sets[name] = state.lenses.map(l => ({ name: l.name, cf: l.cf, lensLen: l.lensLen, mount: l.mount || '', mountCustom: l.mountCustom || '' }));
+  // Skip rows with nothing typed in them — an unused starter row shouldn't
+  // become part of the saved set.
+  sets[name] = state.lenses
+    .filter(l => l.name || l.cf || l.lensLen)
+    .map(l => ({ name: l.name, cf: l.cf, lensLen: l.lensLen, mount: l.mount || '', mountCustom: l.mountCustom || '' }));
   if (!writeStore(sets)) { setPanelNote('Could not save — browser storage unavailable or full.', 'warn'); return; }
+  lastSetName = name;
   refreshSetSelect(name);
   setPanelNote(`Saved "${name}".`, 'ok');
 }
@@ -1335,9 +1531,45 @@ function commitLoadSet(name, mode) {
   } else {
     state.lenses = withIds;
   }
+  lastSetName = name;
   setPanel(null);
   renderLensTable();
   renderOutputs();
+}
+function renameSelectedSet() {
+  const name = el('setSelect').value;
+  if (BUILT_IN_SETS[name]) { setPanelNote('Built-in presets can\'t be renamed.', 'warn'); return; }
+  if (!name || !readStore()[name]) { setPanelNote('No saved set selected.', 'warn'); return; }
+  panelState.pending = { name };
+  setPanel(`<label for="renameInput" style="margin:0">Rename “${escapeText(name)}” to</label>` +
+    `<input type="text" id="renameInput" class="narrow" value="${escapeAttr(name)}">` +
+    `<button class="primary" data-act="rename-do">Rename</button>` +
+    `<button data-act="panel-cancel">Cancel</button>` +
+    `<span class="inline-note" id="renameErr"></span>`);
+  const inp = el('renameInput');
+  inp.focus();
+  inp.select();
+}
+function tryRenameSet(oldName) {
+  const inp = el('renameInput');
+  if (!inp || !oldName) return;
+  const next = inp.value.trim();
+  const err = el('renameErr');
+  if (!next) { inp.classList.add('bad'); inp.focus(); return; }
+  inp.classList.remove('bad');
+  if (next === oldName) { panelState.pending = null; setPanel(null); return; } // no change
+  if (BUILT_IN_SETS[next]) { err.textContent = 'That name is a built-in preset — choose another.'; return; }
+  if (readStore()[next]) { err.textContent = 'A saved set with that name already exists.'; return; }
+  const sets = readStore();
+  if (!sets[oldName]) { setPanelNote('That set no longer exists.', 'warn'); return; }
+  // Re-key the entry, preserving its contents.
+  sets[next] = sets[oldName];
+  delete sets[oldName];
+  if (!writeStore(sets)) { setPanelNote('Could not rename — browser storage unavailable or full.', 'warn'); return; }
+  if (lastSetName === oldName) lastSetName = next;
+  panelState.pending = null;
+  refreshSetSelect(next);
+  setPanelNote(`Renamed to "${next}".`, 'ok');
 }
 function deleteSelectedSet() {
   const name = el('setSelect').value;
@@ -1392,33 +1624,12 @@ function svgVarsToExportHex(xml) {
   return xml.replace(/var\((--[a-z-]+)\)/g, (m, name) => EXPORT_HEX[name] || '#000');
 }
 
-function renderChart({ gap, reference, lensData }) {
-  const container = el('allLensesChartContainer');
-  if (state.lenses.length === 0) { container.innerHTML = '<p class="note">Add lenses to see this graph.</p>'; return; }
-  if (lensData.length === 0) {
-    container.innerHTML = '<p class="note">Fill in name, close focus' + (reference === 'filmplane' ? ', lens length, and mount' : '') + ' for a lens to see it here.</p>';
-    return;
-  }
-  if (!state.diopters.some(dp => typeof dp.power === 'number' && dp.power !== 0)) { container.innerHTML = '<p class="note">Add a diopter with a strength value to see this graph.</p>'; return; }
-
-  let minVal = Infinity, maxVal = -Infinity;
-  lensData.forEach(ld => {
-    ld.rows.forEach(r => {
-      if (!r.valid) return;
-      minVal = Math.min(minVal, r.near);
-      // Infinite far limits (negative diopters) can't set the scale — their
-      // bars run to the plot edge whatever the domain is.
-      maxVal = Math.max(maxVal, isFinite(r.far) ? r.far : r.near);
-    });
-    minVal = Math.min(minVal, ld.marker); maxVal = Math.max(maxVal, ld.marker);
-  });
-  if (!isFinite(minVal)) { container.innerHTML = '<p class="invalid">No valid values to graph yet.</p>'; return; }
-
-  const range = (maxVal - minVal) || 1;
-  const pad = range * 0.12;
-  const domainMin = Math.max(0, minVal - pad);
-  const domainMax = maxVal + pad;
-
+/* Builds the graph SVG for a set of lenses against a SHARED domain, so blocks
+   rendered separately (one per lens for print) stay directly comparable.
+   idPrefix keeps element ids unique when several SVGs are on the page.
+   stripeFrom is the lens's index in the full list, so zebra striping matches
+   the on-screen version even when each lens is rendered on its own. */
+function buildChartSVG(lensData, domainMin, domainMax, idPrefix, stripeFrom) {
   const leftMargin = 90, rightMargin = 40, topMargin = 34;
   const barHeight = 14, rowHeight = barHeight + 2, headerHeight = 20, groupGap = 14;
   const plotWidth = 560;
@@ -1440,7 +1651,7 @@ function renderChart({ gap, reference, lensData }) {
   let svg = `<svg viewBox="0 0 ${chartWidth} ${chartHeight}" width="100%" style="max-width:${chartWidth}px" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, Arial, sans-serif" font-size="11">`;
 
   groupBounds.forEach((gb, idx) => {
-    if (idx % 2 === 0) svg += `<rect x="0" y="${gb.top}" width="${chartWidth}" height="${gb.height}" fill="var(--bg-soft)"/>`;
+    if ((idx + stripeFrom) % 2 === 0) svg += `<rect x="0" y="${gb.top}" width="${chartWidth}" height="${gb.height}" fill="var(--bg-soft)"/>`;
   });
   minor.forEach(t => {
     const x = scaleX(t);
@@ -1491,24 +1702,25 @@ function renderChart({ gap, reference, lensData }) {
       const rangeLabel = fmt(Math.abs(r.far - r.near));
       // Inside-bar range label; a post-render getBBox pass moves it into brackets
       // after the far value if it doesn't actually fit inside the bar.
-      svg += `<text class="rangeIn" data-bw="${barWidth}" data-far="far-${idx}-${ri}" x="${(x1 + x2) / 2}" y="${rowY + 3}" text-anchor="middle" fill="#fff" font-size="9" font-weight="bold">${rangeLabel}</text>`;
-      svg += `<text id="far-${idx}-${ri}" x="${Math.max(x1, x2) + 4}" y="${rowY + 4}" text-anchor="start" fill="var(--ink)" font-size="10">${fmt(r.far)}</text>`;
+      svg += `<text class="rangeIn" data-bw="${barWidth}" data-far="${idPrefix}far-${idx}-${ri}" x="${(x1 + x2) / 2}" y="${rowY + 3}" text-anchor="middle" fill="#fff" font-size="9" font-weight="bold">${rangeLabel}</text>`;
+      svg += `<text id="${idPrefix}far-${idx}-${ri}" x="${Math.max(x1, x2) + 4}" y="${rowY + 4}" text-anchor="start" fill="var(--ink)" font-size="10">${fmt(r.far)}</text>`;
     });
   });
 
   svg += `</svg>`;
-  container.innerHTML = svg;
+  return svg;
+}
 
-  // Exact fit check via getBBox now that the SVG is live in the DOM.
+/* Post-render measurement passes (need the SVG live in the DOM to use getBBox). */
+function fitChartLabels(container) {
   container.querySelectorAll('text.rangeIn').forEach(t => {
     const barWidth = parseFloat(t.getAttribute('data-bw'));
     if (t.getBBox().width + 6 > barWidth) {
-      const farLabel = container.querySelector('#' + t.getAttribute('data-far'));
+      const farLabel = container.querySelector('#' + CSS.escape(t.getAttribute('data-far')));
       if (farLabel) farLabel.textContent += ` (${t.textContent})`;
       t.remove();
     }
   });
-
   // Long lens names: shorten with an ellipsis until they clear the space
   // reserved before the green CF marker line. Full name stays on hover.
   container.querySelectorAll('text.lensname').forEach(t => {
@@ -1523,6 +1735,51 @@ function renderChart({ gap, reference, lensData }) {
       if (titleEl) t.insertBefore(titleEl, t.firstChild); // textContent wipes children — restore the tooltip
     }
   });
+}
+
+function renderChart({ gap, reference, lensData }) {
+  const container = el('allLensesChartContainer');
+  const printContainer = el('printChartContainer');
+  const clearPrint = () => { if (printContainer) printContainer.innerHTML = ''; };
+  if (state.lenses.length === 0) { container.innerHTML = '<p class="note">Add lenses to see this graph.</p>'; clearPrint(); return; }
+  if (lensData.length === 0) {
+    container.innerHTML = '<p class="note">Fill in name, close focus' + (reference === 'filmplane' ? ', lens length, and mount' : '') + ' for a lens to see it here.</p>';
+    clearPrint(); return;
+  }
+  if (!state.diopters.some(dp => typeof dp.power === 'number' && dp.power !== 0)) { container.innerHTML = '<p class="note">Add a diopter with a strength value to see this graph.</p>'; clearPrint(); return; }
+
+  let minVal = Infinity, maxVal = -Infinity;
+  lensData.forEach(ld => {
+    ld.rows.forEach(r => {
+      if (!r.valid) return;
+      minVal = Math.min(minVal, r.near);
+      // Infinite far limits (negative diopters) can't set the scale — their
+      // bars run to the plot edge whatever the domain is.
+      maxVal = Math.max(maxVal, isFinite(r.far) ? r.far : r.near);
+    });
+    minVal = Math.min(minVal, ld.marker); maxVal = Math.max(maxVal, ld.marker);
+  });
+  if (!isFinite(minVal)) { container.innerHTML = '<p class="invalid">No valid values to graph yet.</p>'; clearPrint(); return; }
+
+  const range = (maxVal - minVal) || 1;
+  const pad = range * 0.12;
+  const domainMin = Math.max(0, minVal - pad);
+  const domainMax = maxVal + pad;
+
+  // On screen: one continuous SVG, exactly as before.
+  container.innerHTML = buildChartSVG(lensData, domainMin, domainMax, '', 0);
+  fitChartLabels(container);
+
+  // For print: the same graph split into one block per lens, each carrying its
+  // own copy of the distance scale and marked unbreakable, so a lens can never
+  // be sliced across a page boundary. Same geometry constants, so it looks the
+  // same — just paginated sensibly. Hidden on screen.
+  if (printContainer) {
+    printContainer.innerHTML = lensData.map((ld, i) =>
+      `<div class="print-lens-block">${buildChartSVG([ld], domainMin, domainMax, `p${i}-`, i)}</div>`
+    ).join('');
+    fitChartLabels(printContainer);
+  }
 }
 
 function renderResultsTable({ lensData }) {
@@ -1656,15 +1913,51 @@ function renderGapBreakdown(lensData) {
 }
 
 /* ---------- chart PNG download ---------- */
+/* ---------- export mark ----------
+   Appears on the PNG and on print. Carries the app name plus the settings the
+   graph was produced with, so an exported or printed graph is self-documenting
+   (a printout otherwise has no record of the gap or reference point used). */
+function exportContextLine() {
+  const gapParsed = parseDistance(el('mountingGap').value, 'mm');
+  const gap = isNaN(gapParsed) ? 0 : gapParsed;
+  const ref = state.reference === 'filmplane' ? 'from film plane' : 'from diopter';
+  const dios = state.diopters
+    .filter(dp => typeof dp.power === 'number' && dp.power !== 0)
+    .map(dp => diopterLabel(dp.power)).join('  ');
+  const parts = [ref, `gap ${fmt(gap)}`];
+  if (dios) parts.push(dios);
+  return parts.join('   ·   ');
+}
+const EXPORT_MARK = 'APERTURE LABORATORIES  ·  DIOPTER CALC';
+
 function downloadChartPNG() {
   const svgEl = el('allLensesChartContainer').querySelector('svg');
   if (!svgEl) { chartNoteMsg('Nothing to export yet — fill in a lens first.'); return; }
   const vb = svgEl.viewBox.baseVal;
   const scale = 2; // 2x for crisp output
+  const footerH = 38;
+  const totalH = vb.height + footerH;
   const clone = svgEl.cloneNode(true);
+  clone.setAttribute('viewBox', `0 0 ${vb.width} ${totalH}`);
   clone.setAttribute('width', vb.width);
-  clone.setAttribute('height', vb.height);
+  clone.setAttribute('height', totalH);
   clone.removeAttribute('style');
+
+  // Footer band: hairline rule, settings on the left, the mark on the right.
+  const fy = vb.height + 16;
+  const ns = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, text) => {
+    const n = document.createElementNS(ns, tag);
+    Object.entries(attrs).forEach(([k, v]) => n.setAttribute(k, v));
+    if (text !== undefined) n.textContent = text;
+    return n;
+  };
+  clone.appendChild(mk('line', { x1: 6, y1: vb.height + 4, x2: vb.width - 6, y2: vb.height + 4,
+    stroke: 'var(--line)', 'stroke-width': 1 }));
+  clone.appendChild(mk('text', { x: 6, y: fy + 8, 'font-size': 9, fill: 'var(--steel)' }, exportContextLine()));
+  clone.appendChild(mk('text', { x: vb.width - 6, y: fy + 8, 'text-anchor': 'end', 'font-size': 9,
+    'letter-spacing': '0.08em', 'font-weight': 'bold', fill: 'var(--steel)' }, EXPORT_MARK));
+
   const xml = svgVarsToExportHex(new XMLSerializer().serializeToString(clone));
   const svgBlob = new Blob([xml], { type: 'image/svg+xml;charset=utf-8' });
   const url = URL.createObjectURL(svgBlob);
@@ -1672,7 +1965,7 @@ function downloadChartPNG() {
   img.onload = () => {
     const canvas = document.createElement('canvas');
     canvas.width = vb.width * scale;
-    canvas.height = vb.height * scale;
+    canvas.height = totalH * scale;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1727,8 +2020,32 @@ function handleCSVImport(file) {
     renderLensTable();
     renderOutputs();
     el('csvImport').value = '';
-    if (imported === 0) setPanelNote('No lens rows found to import.', 'warn');
-    else setPanelNote(`Imported ${imported} ${imported === 1 ? 'lens' : 'lenses'}.`, 'ok');
+    if (imported === 0) { setPanelNote('No lens rows found to import.', 'warn'); return; }
+
+    // Offer to keep the import as a saved set, named after the file.
+    const baseName = (file.name || '').replace(/\.csv$/i, '').trim();
+    if (!storageOK || !baseName) {
+      setPanelNote(`Imported ${imported} ${imported === 1 ? 'lens' : 'lenses'}.`, 'ok');
+      return;
+    }
+    const msg = `Imported ${imported} ${imported === 1 ? 'lens' : 'lenses'}.`;
+    if (BUILT_IN_SETS[baseName]) {
+      // Can't shadow a built-in preset — go straight to a numbered suggestion.
+      panelState.pending = { name: baseName };
+      openSaveSetPanel(uniqueSetName(baseName),
+        `${escapeText(msg)} “${escapeText(baseName)}” is a built-in preset name, so a new name is suggested.`);
+    } else if (readStore()[baseName]) {
+      panelState.pending = { name: baseName };
+      panelConfirm(`${escapeText(msg)} A saved set called “${escapeText(baseName)}” already exists.`, [
+        { label: 'Overwrite it', act: 'import-overwrite' },
+        { label: 'Save as new name', act: 'import-rename', primary: true }
+      ]);
+    } else {
+      panelState.pending = { name: baseName };
+      panelConfirm(`${escapeText(msg)} Save as a set called “${escapeText(baseName)}”?`, [
+        { label: 'Save set', act: 'import-save', primary: true }
+      ]);
+    }
   };
   reader.readAsText(file);
 }
@@ -1808,14 +2125,22 @@ function bindEvents() {
   el('mountingGap').addEventListener('input', e => onDistanceInput(e.target));
 
   el('btnAddDiopter').addEventListener('click', addDiopter);
-  el('btnAddLens').addEventListener('click', addLens);
+  el('btnAddLens').addEventListener('click', () => addLens(true));
+  el('btnUndoDelete').addEventListener('click', undoRemove);
+  el('btnClearLenses').addEventListener('click', clearAllLenses);
   el('btnLoadSet').addEventListener('click', loadSelectedSet);
   el('btnSaveSet').addEventListener('click', saveCurrentSet);
   el('btnDeleteSet').addEventListener('click', deleteSelectedSet);
+  el('btnRenameSet').addEventListener('click', renameSelectedSet);
   el('csvImport').addEventListener('change', e => handleCSVImport(e.target.files[0]));
   el('btnCSVTemplate').addEventListener('click', downloadCSVTemplate);
   el('btnExportLenses').addEventListener('click', exportLensesCSV);
-  el('btnPrint').addEventListener('click', () => window.print());
+  el('btnPrint').addEventListener('click', () => {
+    // Populate the running footer with the settings in force right now.
+    el('printFooterContext').textContent = exportContextLine();
+    el('printFooterMark').textContent = EXPORT_MARK;
+    window.print();
+  });
   el('btnDownloadPNG').addEventListener('click', downloadChartPNG);
   el('btnExportResults').addEventListener('click', exportResultsCSV);
   el('breakdownLens').addEventListener('change', renderOutputs);
@@ -1834,9 +2159,22 @@ function bindEvents() {
     else if (act === 'load-add') { panelState.pending = null; if (pendingName) commitLoadSet(pendingName, 'add'); }
     else if (act === 'load-replace') { panelState.pending = null; if (pendingName) commitLoadSet(pendingName, 'replace'); }
     else if (act === 'delete-do') { panelState.pending = null; if (pendingName) commitDeleteSet(pendingName); }
+    else if (act === 'rename-do') { if (pendingName) tryRenameSet(pendingName); }
+    else if (act === 'clear-do') { panelState.pending = null; commitClearLenses(); }
+    else if (act === 'undo-remove') { panelState.pending = null; undoRemove(); }
+    else if (act === 'import-save' || act === 'import-overwrite') { panelState.pending = null; if (pendingName) commitSaveSet(pendingName); }
+    else if (act === 'import-rename') {
+      // Keep the original in pending so uniqueSetName numbers off it.
+      openSaveSetPanel(uniqueSetName(pendingName || ''));
+    }
   });
   el('setPanel').addEventListener('keydown', e => {
     if (e.key === 'Enter' && e.target.id === 'setNameInput') { e.preventDefault(); trySaveSet(); }
+    if (e.key === 'Enter' && e.target.id === 'renameInput') {
+      e.preventDefault();
+      const pending = panelState.pending && panelState.pending.name;
+      if (pending) tryRenameSet(pending);
+    }
   });
 
   const rowId = target => {
@@ -2166,6 +2504,7 @@ initSavedSets();
 loadPersistedState();
 setTheme(state.theme); // applies the html attribute + button label
 renderUnitDefaultNote();
+refreshUndoButton();
 el('versionNote').textContent = APP_VERSION;
 
 const feedbackSubject = encodeURIComponent(`Diopter Calc feedback (${APP_VERSION})`);
@@ -2173,7 +2512,7 @@ const feedbackBody = encodeURIComponent(`Version: ${APP_VERSION}\n\n(Describe th
 el('feedbackLink').href = `mailto:irwinsamj@gmail.com?subject=${feedbackSubject}&body=${feedbackBody}`;
 renderDiopterTable();
 if (state.lenses.length) { renderLensTable(); renderOutputs(); }
-else addLens(); // first visit: start with one empty row for convenience
+else addLens(false); // first visit: start with one empty row (no focus — don't pop the keyboard on load)
 bindExplorer();
 syncExplorerSliders();
 renderBarrelTicks();
