@@ -362,7 +362,6 @@ try {
       <div class="label">Units</div>
       <label class="opt"><input type="radio" name="unit" value="ft" checked> Feet / inches</label>
       <label class="opt"><input type="radio" name="unit" value="m"> Meters</label>
-      <div class="note" id="unitDefaultNote" style="margin-top:5px"></div>
     </div>
 
     <div class="control">
@@ -506,6 +505,8 @@ try {
     <button id="btnClearLenses">Clear lens table</button>
     <div id="slotLenses" class="panel-slot"></div>
   </div>
+
+  <p class="note" id="unitDefaultNote" style="margin:0 0 4px">Typed with no unit: close focus reads as inches, lens length as mm.</p>
 
   <div class="table-scroll">
   <table id="lensTable">
@@ -700,7 +701,7 @@ try {
 <script>
 'use strict';
 // [pure-core-start]
-const APP_VERSION = 'v30'; // bump this on every revision — shown under the title
+const APP_VERSION = 'v1.30'; // bump the decimal on every revision — shown next to the title
 const M_PER_FT = 0.3048;
 
 /* Flange focal depth by mount type — the fixed distance from the mount's contact
@@ -1006,7 +1007,7 @@ function csvField(value) {
 /* ==================== DOM / rendering ==================== */
 const el = id => document.getElementById(id);
 
-function setUnit(u) { state.unit = u; renderUnitDefaultNote(); renderOutputs(); refreshInputHints(); renderBarrelTicks(); updateExplorer(); }
+function setUnit(u) { state.unit = u; renderOutputs(); refreshInputHints(); renderBarrelTicks(); updateExplorer(); }
 function setReference(r) { state.reference = r; renderOutputs(); }
 
 /* ---------- theme ----------
@@ -1082,11 +1083,6 @@ function loadPersistedState() {
   const rr = document.querySelector(`input[name="reference"][value="${state.reference}"]`);
   if (rr) rr.checked = true;
 }
-function renderUnitDefaultNote() {
-  const n = el('unitDefaultNote');
-  if (n) n.textContent = 'Typed with no unit: close focus reads as inches, lens length and gaps as mm.';
-}
-
 /* Distance inputs: red outline while unparseable, tooltip shows the interpreted value.
    data-defunit lets a field declare what a bare number means (see parseDistance). */
 function styleDistanceInput(input) {
@@ -2575,7 +2571,6 @@ bindEvents();
 initSavedSets();
 loadPersistedState();
 setTheme(state.theme); // applies the html attribute + button label
-renderUnitDefaultNote();
 refreshUndoButton();
 el('versionNote').textContent = APP_VERSION;
 
