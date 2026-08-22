@@ -1998,7 +1998,7 @@ function handleCSVImport(file) {
     const lenIdx = header.findIndex(h => h.includes('length'));
     const mountIdx = header.findIndex(h => h.includes('mount'));
     if (nameIdx === -1 || cfIdx === -1 || lenIdx === -1) {
-      setPanelNote('Could not find "Lens name", "Close focus", and "Lens Length" columns in the header row.', 'warn');
+      setPanelNote('That file doesn\'t look like a lens CSV — it needs a header row containing "Lens name", "Close focus" and "Lens Length". Use the Template button to get the right format.', 'warn');
       return;
     }
     const knownMounts = ['PL', 'LPL', 'PV'];
