@@ -700,7 +700,7 @@ try {
 <script>
 'use strict';
 // [pure-core-start]
-const APP_VERSION = 'v29'; // bump this on every revision — shown under the title
+const APP_VERSION = 'v30'; // bump this on every revision — shown under the title
 const M_PER_FT = 0.3048;
 
 /* Flange focal depth by mount type — the fixed distance from the mount's contact
@@ -1035,6 +1035,7 @@ function persistState() {
       unit: state.unit,
       reference: state.reference,
       gap: el('mountingGap').value,
+      setName: lastSetName,
       diopters: state.diopters.map(dp => ({ power: dp.power, thickness: dp.thickness })),
       explorer: { D: exState.D, cf: exState.cf, lensLen: exState.lensLen, gap: exState.gap, thickness: exState.thickness, mount: exState.mount },
       lenses: state.lenses.map(l => ({ name: l.name, cf: l.cf, lensLen: l.lensLen, mount: l.mount || '', mountCustom: l.mountCustom || '' }))
@@ -1050,6 +1051,7 @@ function loadPersistedState() {
   if (s.unit === 'ft' || s.unit === 'm') state.unit = s.unit;
   if (s.reference === 'filmplane' || s.reference === 'diopter') state.reference = s.reference;
   if (typeof s.gap === 'string') el('mountingGap').value = s.gap;
+  if (typeof s.setName === 'string') lastSetName = s.setName;
   if (Array.isArray(s.diopters)) {
     state.diopters = s.diopters
       .filter(dp => dp && typeof dp === 'object' && (dp.power === null || typeof dp.power === 'number'))
@@ -1526,6 +1528,7 @@ function commitSaveSet(name) {
     .map(l => ({ name: l.name, cf: l.cf, lensLen: l.lensLen, mount: l.mount || '', mountCustom: l.mountCustom || '' }));
   if (!writeStore(sets)) { setPanelNote('Could not save — browser storage unavailable or full.', 'warn'); return; }
   lastSetName = name;
+  persistState();
   refreshSetSelect(name);
   setPanelNote(`Saved "${name}".`, 'ok');
 }
@@ -1600,6 +1603,7 @@ function tryRenameSet(oldName) {
   delete sets[oldName];
   if (!writeStore(sets)) { setPanelNote('Could not rename — browser storage unavailable or full.', 'warn'); return; }
   if (lastSetName === oldName) lastSetName = next;
+  persistState();
   panelState.pending = null;
   refreshSetSelect(next);
   setPanelNote(`Renamed to "${next}".`, 'ok');
@@ -1617,6 +1621,7 @@ function commitDeleteSet(name) {
   delete sets[name];
   writeStore(sets);
   if (lastSetName === name) lastSetName = '';
+  persistState();
   refreshSetSelect();
   setPanelNote(`Deleted "${name}".`, 'ok');
 }
@@ -1959,7 +1964,7 @@ function exportContextLine() {
   const dios = state.diopters
     .filter(dp => typeof dp.power === 'number' && dp.power !== 0)
     .map(dp => diopterLabel(dp.power)).join('  ');
-  const parts = [ref, `gap ${fmt(gap)}`];
+  const parts = [ref, `mounting gap ${fmt(gap)}`];
   if (dios) parts.push(dios);
   return parts.join('   ·   ');
 }
