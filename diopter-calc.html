@@ -216,8 +216,8 @@ try {
     text-transform: uppercase; letter-spacing: 0.06em; color: var(--steel);
     margin-right: 2px; white-space: nowrap;
   }
-  .current-set { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .current-set b { color: var(--ink); font-weight: 600; }
+  .panel-slot { flex: 1 1 320px; min-width: 0; }
+  .panel-slot:empty { display: none; }
   /* The native file input can't be styled, so hide it inside a label that
      looks like the other buttons. */
   .filebtn {
@@ -489,6 +489,10 @@ try {
     <button id="btnDeleteSet">Delete</button>
   </div>
 
+  <div id="slotSets" class="panel-slot">
+    <div class="inline-panel no-print" id="setPanel" hidden></div>
+  </div>
+
   <div class="tool-group">
     <span class="tool-label">CSV file</span>
     <label class="filebtn">Import<input type="file" accept=".csv,text/csv,text/comma-separated-values,application/csv,text/plain" id="csvImport"></label>
@@ -500,8 +504,7 @@ try {
 
   <div class="toolbar" style="margin-bottom:6px">
     <button id="btnClearLenses">Clear lens table</button>
-    <span id="currentSetBar" class="current-set"></span>
-    <div class="inline-panel no-print" id="setPanel" hidden></div>
+    <div id="slotLenses" class="panel-slot"></div>
   </div>
 
   <div class="table-scroll">
@@ -697,7 +700,7 @@ try {
 <script>
 'use strict';
 // [pure-core-start]
-const APP_VERSION = 'v28'; // bump this on every revision — shown under the title
+const APP_VERSION = 'v29'; // bump this on every revision — shown under the title
 const M_PER_FT = 0.3048;
 
 /* Flange focal depth by mount type — the fixed distance from the mount's contact
@@ -1198,6 +1201,7 @@ function refreshUndoButton() {
   b.title = n ? 'Restore the most recently deleted lens or lenses' : 'Nothing to restore';
 }
 function offerUndoRemove() {
+  panelIn('lenses');
   const top = undoStack[undoStack.length - 1];
   if (!top) return;
   const n = top.lenses.length;
@@ -1207,6 +1211,7 @@ function offerUndoRemove() {
   panelConfirm(what, [{ label: 'Undo', act: 'undo-remove', primary: true }]);
 }
 function undoRemove() {
+  panelIn('lenses');
   const entry = undoStack.pop();
   if (!entry) { setPanelNote('Nothing left to restore.', 'warn'); return; }
   if (entry.kind === 'all') {
@@ -1241,6 +1246,7 @@ function removeLens(id) {
 }
 
 function clearAllLenses() {
+  panelIn('lenses');
   if (state.lenses.length === 0) { setPanelNote('There are no lenses to clear.', 'warn'); return; }
   const n = state.lenses.length;
   panelConfirm(`Clear all ${n} ${n === 1 ? 'lens' : 'lenses'} from the set?`,
@@ -1392,10 +1398,18 @@ function builtInAsLensArray(name) {
    Notes auto-hide; confirms wait for a button. */
 const panelState = { pending: null }; // { name } carried into a confirm step
 let panelTimer = null;
+/* The panel appears next to whatever the action relates to: set operations
+   (load/save/rename/delete/CSV) render up in the saved-sets area, lens-table
+   operations (clear/undo) render beside the Clear button. Entry points set
+   this before opening; follow-on commits inherit it. */
+let panelSlot = 'sets';
+function panelIn(slot) { panelSlot = slot; }
 function setPanel(html, kind) {
   const p = el('setPanel');
   clearTimeout(panelTimer);
   if (!html) { p.hidden = true; p.innerHTML = ''; return; }
+  const host = el(panelSlot === 'lenses' ? 'slotLenses' : 'slotSets');
+  if (host && p.parentElement !== host) host.appendChild(p);
   p.className = 'inline-panel no-print' + (kind ? ' ' + kind : '');
   p.innerHTML = html;
   p.hidden = false;
@@ -1472,6 +1486,7 @@ function uniqueSetName(base) {
 }
 
 function saveCurrentSet() {
+  panelIn('sets');
   if (state.lenses.length === 0) { setPanelNote('Add some lenses first.', 'warn'); return; }
   // Pre-fill with the last set worked on, numbered up if that name is taken,
   // so the common "save a variation" case needs no typing.
@@ -1512,10 +1527,10 @@ function commitSaveSet(name) {
   if (!writeStore(sets)) { setPanelNote('Could not save — browser storage unavailable or full.', 'warn'); return; }
   lastSetName = name;
   refreshSetSelect(name);
-  renderCurrentSetBar();
   setPanelNote(`Saved "${name}".`, 'ok');
 }
 function loadSelectedSet() {
+  panelIn('sets');
   const name = el('setSelect').value;
   if (!name || (!BUILT_IN_SETS[name] && !readStore()[name])) { setPanelNote('No saved set selected.', 'warn'); return; }
   const hasContent = state.lenses.some(l => (l.name || l.cf || l.lensLen));
@@ -1544,40 +1559,10 @@ function commitLoadSet(name, mode) {
     state.lenses = withIds;
   }
   lastSetName = name;
-  renderCurrentSetBar();
   setPanel(null);
   renderLensTable();
   renderOutputs();
 }
-/* Shows which set is currently loaded, with the appropriate action attached:
-   rename for one of your own saved sets, "Save as…" for a built-in preset or
-   unsaved work. Without this there's no way to tell what you're editing — the
-   dropdown only shows what's selected, which isn't necessarily what's loaded. */
-function renderCurrentSetBar() {
-  const bar = el('currentSetBar');
-  if (!bar) return;
-  const name = lastSetName;
-  const isBuiltIn = Boolean(name && BUILT_IN_SETS[name]);
-  const isSaved = Boolean(name && storageOK && readStore()[name]);
-  let label, btn;
-  if (!name) {
-    label = 'Current set: <b>not saved yet</b>';
-    btn = `<button id="btnBarSave">Save as…</button>`;
-  } else if (isBuiltIn) {
-    label = `Current set: <b>${escapeText(name)}</b> <span class="note">(built-in preset)</span>`;
-    btn = `<button id="btnBarSave">Save as…</button>`;
-  } else if (isSaved) {
-    label = `Current set: <b>${escapeText(name)}</b>`;
-    btn = `<button id="btnBarRename">Rename</button>`;
-  } else {
-    label = `Current set: <b>${escapeText(name)}</b> <span class="note">(not saved)</span>`;
-    btn = `<button id="btnBarSave">Save as…</button>`;
-  }
-  bar.innerHTML = `<span class="note" style="margin:0">${label}</span>${btn}`;
-  const r = el('btnBarRename'); if (r) r.addEventListener('click', renameCurrentSet);
-  const s = el('btnBarSave'); if (s) s.addEventListener('click', saveCurrentSet);
-}
-
 function renameSelectedSet() {
   openRenamePanel(el('setSelect').value);
 }
@@ -1585,6 +1570,7 @@ function renameCurrentSet() {
   openRenamePanel(lastSetName);
 }
 function openRenamePanel(name) {
+  panelIn('sets');
   if (BUILT_IN_SETS[name]) { setPanelNote('Built-in presets can\'t be renamed — use “Save as…” to keep your own copy.', 'warn'); return; }
   if (!name || !readStore()[name]) { setPanelNote('No saved set selected.', 'warn'); return; }
   panelState.pending = { name };
@@ -1616,10 +1602,10 @@ function tryRenameSet(oldName) {
   if (lastSetName === oldName) lastSetName = next;
   panelState.pending = null;
   refreshSetSelect(next);
-  renderCurrentSetBar();
   setPanelNote(`Renamed to "${next}".`, 'ok');
 }
 function deleteSelectedSet() {
+  panelIn('sets');
   const name = el('setSelect').value;
   if (BUILT_IN_SETS[name]) { setPanelNote('Built-in presets can\'t be deleted.', 'warn'); return; }
   if (!name || !readStore()[name]) { setPanelNote('No saved set selected.', 'warn'); return; }
@@ -1632,7 +1618,6 @@ function commitDeleteSet(name) {
   writeStore(sets);
   if (lastSetName === name) lastSetName = '';
   refreshSetSelect();
-  renderCurrentSetBar();
   setPanelNote(`Deleted "${name}".`, 'ok');
 }
 function initSavedSets() {
@@ -2032,6 +2017,7 @@ function downloadChartPNG() {
 
 /* ---------- CSV import / template / export ---------- */
 function handleCSVImport(file) {
+  panelIn('sets');
   if (!file) return;
   const reader = new FileReader();
   reader.onload = e => {
@@ -2130,6 +2116,7 @@ function downloadCSVTemplate() {
    mount's flange distance is written directly in the Mount column, which
    Import CSV already treats as a custom flange when it isn't PL/LPL/PV. */
 function exportLensesCSV() {
+  panelIn('sets');
   const usable = state.lenses.filter(l => l.name || l.cf || l.lensLen);
   if (usable.length === 0) { setPanelNote('Add a lens first.', 'warn'); return; }
   // Pre-fill with the set currently being worked on, so exporting and
@@ -2585,7 +2572,6 @@ loadPersistedState();
 setTheme(state.theme); // applies the html attribute + button label
 renderUnitDefaultNote();
 refreshUndoButton();
-renderCurrentSetBar();
 el('versionNote').textContent = APP_VERSION;
 
 const feedbackSubject = encodeURIComponent(`Diopter Calc feedback (${APP_VERSION})`);
