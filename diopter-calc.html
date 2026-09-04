@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Irwin Cine Diopter Calc</title>
+<title>Irwin Cine Diopter Calculator</title>
 <script>
 /* Runs before first paint so a saved light theme doesn't flash dark.
    The main script at the bottom owns everything else. */
@@ -332,7 +332,7 @@ try {
 <body>
 
 <div class="titlebar">
-  <h1>Irwin Cine&rsquo; Diopter Calc <span class="note" id="versionNote" style="font-weight:400"></span></h1>
+  <h1>Irwin Cine Diopter Calculator <span class="note" id="versionNote" style="font-weight:400"></span></h1>
   <button id="btnTheme" class="no-print">Light mode</button>
 </div>
 <noscript>
@@ -701,7 +701,7 @@ try {
 <script>
 'use strict';
 // [pure-core-start]
-const APP_VERSION = 'v1.30'; // bump the decimal on every revision — shown next to the title
+const APP_VERSION = 'v1.31'; // bump the decimal on every revision — shown next to the title
 const M_PER_FT = 0.3048;
 
 /* Flange focal depth by mount type — the fixed distance from the mount's contact
@@ -1964,7 +1964,7 @@ function exportContextLine() {
   if (dios) parts.push(dios);
   return parts.join('   ·   ');
 }
-const EXPORT_MARK = 'IRWIN CINE  ·  DIOPTER CALC';
+const EXPORT_MARK = 'IRWIN CINE  ·  DIOPTER CALCULATOR';
 
 function downloadChartPNG() {
   const svgEl = el('allLensesChartContainer').querySelector('svg');
