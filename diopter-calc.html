@@ -718,7 +718,7 @@ try {
 <script>
 'use strict';
 // [pure-core-start]
-const APP_VERSION = 'v1.34'; // bump the decimal on every revision — shown next to the title
+const APP_VERSION = 'v1.35'; // bump the decimal on every revision — shown next to the title
 const M_PER_FT = 0.3048;
 
 /* Flange focal depth by mount type — the fixed distance from the mount's contact
@@ -1127,7 +1127,7 @@ function refreshInputHints() {
 function renderDiopterChips() {
   const chips = state.diopters.map(dp => `
     <span class="chip" data-id="${dp.id}">
-      <input type="text" class="chip-input" data-field="power" inputmode="text" value="${dp.power === null || dp.power === undefined ? '' : escapeAttr(String(dp.power))}" placeholder="±" aria-label="Diopter strength">
+      <input type="text" class="chip-input" data-field="power" inputmode="text" value="${dp.power === null || dp.power === undefined ? '' : escapeAttr(diopterLabel(dp.power))}" placeholder="±" aria-label="Diopter strength">
       <button class="chip-rm" data-act="rm" aria-label="Remove">&times;</button>
     </span>`).join('');
   el('diopterChips').innerHTML = chips + `<button type="button" class="chip-add" id="btnAddDiopter">+ Add diopter</button>`;
@@ -1151,7 +1151,7 @@ function onDiopterPowerBlur(id, input) {
   const raw = input.value.trim();
   if (raw === '') { dp.power = null; chip.classList.remove('bad'); note.hidden = true; renderOutputs(); return; } // leave unfilled
   const val = parseFloat(input.value);
-  if (isNaN(val) || val === 0) { input.value = dp.power === null ? '' : String(dp.power); chip.classList.remove('bad'); return; }
+  if (isNaN(val) || val === 0) { input.value = dp.power === null ? '' : diopterLabel(dp.power); chip.classList.remove('bad'); return; }
   if (state.diopters.some(x => x.id !== id && x.power === val)) {
     // Keep what they typed (no silent revert): flag it and leave it out of
     // the results until it's unique.
@@ -1164,6 +1164,7 @@ function onDiopterPowerBlur(id, input) {
     return;
   }
   dp.power = val;
+  input.value = diopterLabel(val); // reformat immediately — e.g. typed "0.5" becomes "+0.5"
   chip.classList.remove('bad');
   input.title = '';
   note.hidden = true;
