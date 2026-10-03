@@ -683,7 +683,7 @@ try {
     </div>
     <div class="ex-control">
       <div class="label"><span>Mounting gap</span><output id="outGap"></output></div>
-      <input type="range" id="inGap" min="0" max="150" step="1" value="25" aria-label="Mounting gap in millimetres">
+      <input type="range" id="inGap" min="0" max="150" step="1" value="3" aria-label="Mounting gap in millimetres">
     </div>
     <div class="ex-control">
       <div class="label"><span>Mount</span><output id="outMount"></output></div>
@@ -718,7 +718,7 @@ try {
 <script>
 'use strict';
 // [pure-core-start]
-const APP_VERSION = 'v1.35'; // bump the decimal on every revision — shown next to the title
+const APP_VERSION = 'v1.36'; // bump the decimal on every revision — shown next to the title
 const M_PER_FT = 0.3048;
 
 /* Flange focal depth by mount type — the fixed distance from the mount's contact
@@ -2328,7 +2328,7 @@ function bindEvents() {
    "explorer". Physics comes from the same focusLimits() the tables use.
    Follows the app's unit and theme controls; metric distances here read
    in cm. */
-const exState = { D: 1, cf: 0.6, lensLen: 0.150, gap: 0.025, mount: 'PL' };
+const exState = { D: 1, cf: 0.6, lensLen: 0.150, gap: 0.003, mount: 'PL' };
 
 function exCm(m) {
   if (m === Infinity) return '∞';
