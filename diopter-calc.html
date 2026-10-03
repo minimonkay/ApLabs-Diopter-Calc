@@ -6,10 +6,14 @@
 <title>Irwin Cine Diopter Calculator</title>
 <script>
 /* Runs before first paint so a saved light theme doesn't flash dark.
-   The main script at the bottom owns everything else. */
+   With no saved preference yet, default to light on larger screens (>=900px)
+   and dark otherwise — this only decides the very first paint; the real
+   decision (and whether it's remembered) is made identically in the main
+   script below. The 900 threshold must be kept in sync with setThemeDefault(). */
 try {
-  var _s = JSON.parse(localStorage.getItem('diopterCalc.state'));
-  if (_s && _s.theme === 'light') document.documentElement.removeAttribute('data-theme');
+  var _t = localStorage.getItem('diopterCalc.theme'); // plain string, own key — see note in setTheme()
+  var _wantDark = (_t === 'light' || _t === 'dark') ? (_t === 'dark') : (window.innerWidth < 900);
+  if (!_wantDark) document.documentElement.removeAttribute('data-theme');
 } catch (e) {}
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -151,6 +155,35 @@ try {
   }
   th .sub { display: block; font-weight: 400; text-transform: none; letter-spacing: normal; color: var(--steel); font-size: 11px; font-family: var(--font-sans); margin-top: 2px; }
   .add-row td { border-top: 2px solid var(--line-strong); background: var(--paper); }
+
+  /* ---- diopter chips ----
+     Each diopter is just a strength now, so a row of small removable chips
+     reads far more lightly than a table shell built for one column. */
+  .chip-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 2px;
+    background: var(--surface); border: 1px solid var(--line-strong); border-radius: 999px;
+    padding: 4px 6px 4px 14px; transition: border-color .12s ease, box-shadow .12s ease;
+  }
+  .chip:focus-within { border-color: var(--amber); box-shadow: 0 0 0 3px var(--amber-soft); }
+  .chip.bad { border-color: var(--warn-red); box-shadow: 0 0 0 3px var(--warn-soft); }
+  .chip-input {
+    width: 52px; border: none; background: none; padding: 2px 0; margin: 0;
+    font-family: var(--font-mono); font-size: 14px; font-weight: 600; text-align: center;
+    color: var(--ink); font-variant-numeric: tabular-nums;
+  }
+  .chip-input:focus { outline: none; box-shadow: none; }
+  .chip-rm {
+    border: none; background: none; cursor: pointer; color: var(--steel);
+    width: 22px; height: 22px; border-radius: 50%; font-size: 15px; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center; padding: 0;
+  }
+  .chip-rm:hover { background: var(--bg-soft); color: var(--warn-red); }
+  .chip-add {
+    border: 1px dashed var(--line-strong); background: none; border-radius: 999px;
+    color: var(--steel); padding: 7px 16px; font-size: 13px;
+  }
+  .chip-add:hover { border-color: var(--amber); color: var(--amber-deep); background: var(--amber-soft); }
   #resultsTable tr.lens-even td { background: var(--bg-soft); }
   #resultsTable tr.lens-odd td { background: var(--surface); }
   /* Numeric result columns: right-aligned tabular mono reads down a column
@@ -244,6 +277,16 @@ try {
     font-family: var(--font-mono); font-size: 12.5px; white-space: pre-wrap;
     background: var(--paper); border-radius: 4px; padding: 3px 8px; margin: 2px 0; display: inline-block;
   }
+  /* Traditional stacked-fraction display for formula lines, in place of an
+     inline "÷" — plain CSS, so no maths-rendering library is needed for
+     what are always simple two-line fractions. */
+  .frac {
+    display: inline-flex; flex-direction: column; align-items: center;
+    vertical-align: middle; margin: 0 4px; line-height: 1.15;
+  }
+  .frac .num, .frac .den { display: block; padding: 0 3px; white-space: nowrap; }
+  .frac .num { border-bottom: 1.3px solid currentColor; padding-bottom: 1px; }
+  .frac .den { padding-top: 1px; }
 
   .gap-diagram {
     display: block; width: 100%; max-width: 500px; height: auto;
@@ -446,32 +489,10 @@ try {
 <!-- ============ STEP 2 ============ -->
 <section>
   <div class="step-head"><span class="step-num">2</span><h2>Your diopters</h2></div>
+  <p class="lead">The strength of each diopter you're carrying — positive or negative.</p>
 
-  <div class="table-scroll">
-  <table id="diopterTable">
-    <thead>
-      <tr>
-        <th>Strength<span class="sub">+ or −</span></th>
-        <th>Glass thickness<span class="sub">optional</span></th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-    <tfoot>
-      <tr class="add-row"><td colspan="3"><button id="btnAddDiopter">+ Add diopter</button></td></tr>
-    </tfoot>
-  </table>
-  </div>
-  <p class="inline-note" id="diopterNote" hidden style="margin:4px 0 0"></p>
-
-  <details>
-    <summary>Why diopter thickness matters</summary>
-    <div class="body">
-      <p>The maths references the <b>optical centre</b> of the diopter, but the mounting gap is measured to its <b>front face</b>. Giving a thickness lets the app add half of it to bridge that difference, so a thick +3 is handled differently from a thin +1/2.</p>
-      <p>The effect is small — half the glass thickness, so around 7mm for a 15mm diopter — and it shifts near and far limits by the same amount. Leave thickness blank and no correction is applied.</p>
-      <p>The default values loaded here are for <b>Schneider 138mm</b> diopters. Replace them with your own if you're using different glass.</p>
-    </div>
-  </details>
+  <div class="chip-row" id="diopterChips"></div>
+  <p class="inline-note" id="diopterNote" hidden style="margin:6px 0 0"></p>
 </section>
 
 <!-- ============ STEP 3 ============ -->
@@ -665,10 +686,6 @@ try {
       <input type="range" id="inGap" min="0" max="150" step="1" value="25" aria-label="Mounting gap in millimetres">
     </div>
     <div class="ex-control">
-      <div class="label"><span>Glass thickness</span><output id="outThk"></output></div>
-      <input type="range" id="inThk" min="0" max="20" step="0.5" value="6" aria-label="Diopter glass thickness in millimetres">
-    </div>
-    <div class="ex-control">
       <div class="label"><span>Mount</span><output id="outMount"></output></div>
       <select id="inMount" aria-label="Lens mount">
         <option value="PL" selected>PL</option>
@@ -701,7 +718,7 @@ try {
 <script>
 'use strict';
 // [pure-core-start]
-const APP_VERSION = 'v1.31'; // bump the decimal on every revision — shown next to the title
+const APP_VERSION = 'v1.34'; // bump the decimal on every revision — shown next to the title
 const M_PER_FT = 0.3048;
 
 /* Flange focal depth by mount type — the fixed distance from the mount's contact
@@ -721,11 +738,11 @@ const state = {
   theme: 'dark',           // 'dark' (default) | 'light' — screen only; print/export stay light
   unit: 'ft',              // 'ft' | 'm'  — display/output unit
   reference: 'filmplane',  // 'diopter' | 'filmplane'
-  diopters: [                // {id, power, thickness} — thickness is raw typed string
-    { id: 1, power: 0.5, thickness: '4mm' },
-    { id: 2, power: 1,   thickness: '6mm' },
-    { id: 3, power: 2,   thickness: '11mm' },
-    { id: 4, power: 3,   thickness: '15mm' }
+  diopters: [                // {id, power}
+    { id: 1, power: 0.5 },
+    { id: 2, power: 1 },
+    { id: 3, power: 2 },
+    { id: 4, power: 3 }
   ],
   nextDiopterId: 5,
   lenses: [],              // {id, name, cf, lensLen, mount, mountCustom} — distances kept as raw typed strings
@@ -822,27 +839,20 @@ function fmtTick(m) {
 
 function diopterLabel(power) { return power > 0 ? `+${power}` : `${power}`; }
 
-/* A diopter's glass thickness in meters (blank => 0, no correction). */
-function diopterThicknessMeters(dp) {
-  const v = parseDistance(dp.thickness, 'mm');
-  return isNaN(v) ? 0 : v;
-}
-
 /* ---------- core maths ----------
    Close focus is always a film-plane measurement (manufacturer convention), so it
    is converted to a lens-front distance before the diopter formulas run:
-     baseSub = mounting gap + lens length (front to mount) + flange depth
-   The mounting gap is measured to the FRONT FACE of the diopter. Each diopter's
-   optical centre sits half its own thickness further from the film plane, so the
-   distance from film plane to the diopter centre is per-diopter:
-     sub(d)  = baseSub + thickness(d) / 2
-     effCF   = CF - sub(d)
-     near*   = effCF / (1 + D * effCF)     (from the diopter centre)
-     far*    = 1 / D                        (from the diopter centre)
-   Film-plane output adds sub(d) back so results read from the film plane.
-   Diopter output adds nothing back (distances are from the diopter centre).
+     sub     = mounting gap + lens length (front to mount) + flange depth
+   The mounting gap is measured to the FRONT FACE of the diopter, which this app
+   also treats as its optical centre — same value for every diopter, since glass
+   thickness isn't tracked:
+     effCF   = CF - sub
+     near*   = effCF / (1 + D * effCF)     (from the diopter)
+     far*    = 1 / D                        (from the diopter)
+   Film-plane output adds sub back so results read from the film plane.
+   Diopter output adds nothing back (distances are from the diopter).
    Lens length + flange are required for film-plane mode; in diopter mode they're
-   optional but used when present. Thickness is optional; blank => zero. */
+   optional but used when present. */
 function computeLensData(lens, gap, reference) {
   const cf = parseDistance(lens.cf, 'in');
   const lensLen = parseDistance(lens.lensLen, 'mm');
@@ -854,26 +864,22 @@ function computeLensData(lens, gap, reference) {
     && (reference !== 'filmplane' || hasBackToPlane);
   if (!complete) return { complete: false };
 
-  const baseSub = gap + backToPlane; // film plane to diopter front face
-  // Marker (native close focus) is diopter-independent, so it uses baseSub only.
-  const markerAddBack = reference === 'filmplane' ? baseSub : 0;
-  const marker = (cf - baseSub) + markerAddBack; // == cf in film-plane mode
+  const sub = gap + backToPlane; // film plane to diopter — same for every diopter now
+  const addBack = reference === 'filmplane' ? sub : 0;
+  // Marker (native close focus) is diopter-independent, so it uses the same sub.
+  const marker = (cf - sub) + addBack; // == cf in film-plane mode
 
   const rows = state.diopters
     .filter(dp => typeof dp.power === 'number' && dp.power !== 0)
     .map(dp => {
     const d = dp.power;
-    const thickness = diopterThicknessMeters(dp);
-    const halfThk = thickness / 2;
-    const sub = baseSub + halfThk;           // film plane to diopter centre
-    const addBack = reference === 'filmplane' ? sub : 0;
     const lim = focusLimits(d, cf, sub, addBack);
-    return { d, label: diopterLabel(d), near: lim.near, far: lim.far, valid: lim.valid, invalidReason: lim.invalidReason, thickness, halfThk, sub };
+    return { d, label: diopterLabel(d), near: lim.near, far: lim.far, valid: lim.valid, invalidReason: lim.invalidReason };
   });
 
   return {
-    complete: true, cf, lensLen, flange, sub: baseSub, marker, rows,
-    gapParts: { gap, lensLen: isNaN(lensLen) ? 0 : lensLen, flange: isNaN(flange) ? 0 : flange, baseSub }
+    complete: true, cf, lensLen, flange, sub, marker, rows,
+    gapParts: { gap, lensLen: isNaN(lensLen) ? 0 : lensLen, flange: isNaN(flange) ? 0 : flange, baseSub: sub }
   };
 }
 
@@ -1013,12 +1019,23 @@ function setReference(r) { state.reference = r; renderOutputs(); }
 /* ---------- theme ----------
    Dark is the default (set on <html> in the markup, so no flash); light is
    the opt-out. Screen only — print and PNG export always come out light. */
-function setTheme(t) {
+/* Theme is stored under its own key (THEME_KEY), not inside the general
+   state blob — deliberately. persistState() below is called from almost
+   every interaction (renderOutputs fires on nearly every edit), so if theme
+   lived in that shared blob, the very next unrelated save after page load
+   would silently write the auto-decided default back out as if the user
+   had chosen it, permanently defeating the screen-size default. Keeping it
+   separate means only an explicit call here (persist !== false) ever
+   touches it. */
+const THEME_KEY = 'diopterCalc.theme';
+function setTheme(t, opts) {
   state.theme = t === 'light' ? 'light' : 'dark';
   if (state.theme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
   else document.documentElement.removeAttribute('data-theme');
   el('btnTheme').textContent = state.theme === 'dark' ? 'Light mode' : 'Dark mode';
-  persistState();
+  if (!opts || opts.persist !== false) {
+    try { window.localStorage.setItem(THEME_KEY, state.theme); } catch (e) {}
+  }
 }
 
 /* ---------- working-state persistence ----------
@@ -1032,23 +1049,29 @@ function persistState() {
   try {
     window.localStorage.setItem(STATE_KEY, JSON.stringify({
       v: 1,
-      theme: state.theme,
       unit: state.unit,
       reference: state.reference,
       gap: el('mountingGap').value,
       setName: lastSetName,
-      diopters: state.diopters.map(dp => ({ power: dp.power, thickness: dp.thickness })),
-      explorer: { D: exState.D, cf: exState.cf, lensLen: exState.lensLen, gap: exState.gap, thickness: exState.thickness, mount: exState.mount },
+      diopters: state.diopters.map(dp => ({ power: dp.power })),
+      explorer: { D: exState.D, cf: exState.cf, lensLen: exState.lensLen, gap: exState.gap, mount: exState.mount },
       lenses: state.lenses.map(l => ({ name: l.name, cf: l.cf, lensLen: l.lensLen, mount: l.mount || '', mountCustom: l.mountCustom || '' }))
     }));
   } catch (e) { /* storage full or blocked — keep working without persistence */ }
 }
+/* True once an explicit saved theme choice is found under THEME_KEY. Stays
+   false on a fresh browser (or after storage is cleared), which is what
+   lets the screen-size default in the init sequence below take over. */
+let themeIsExplicit = false;
 function loadPersistedState() {
   if (!storageOK) return;
+  try {
+    const t = window.localStorage.getItem(THEME_KEY);
+    if (t === 'light' || t === 'dark') { state.theme = t; themeIsExplicit = true; }
+  } catch (e) {}
   let s = null;
   try { s = JSON.parse(window.localStorage.getItem(STATE_KEY)); } catch (e) { return; }
   if (!s || typeof s !== 'object') return;
-  if (s.theme === 'light' || s.theme === 'dark') state.theme = s.theme;
   if (s.unit === 'ft' || s.unit === 'm') state.unit = s.unit;
   if (s.reference === 'filmplane' || s.reference === 'diopter') state.reference = s.reference;
   if (typeof s.gap === 'string') el('mountingGap').value = s.gap;
@@ -1056,7 +1079,7 @@ function loadPersistedState() {
   if (Array.isArray(s.diopters)) {
     state.diopters = s.diopters
       .filter(dp => dp && typeof dp === 'object' && (dp.power === null || typeof dp.power === 'number'))
-      .map(dp => ({ id: state.nextDiopterId++, power: dp.power, thickness: typeof dp.thickness === 'string' ? dp.thickness : '' }));
+      .map(dp => ({ id: state.nextDiopterId++, power: dp.power }));
   }
   if (Array.isArray(s.lenses)) {
     state.lenses = s.lenses
@@ -1075,7 +1098,6 @@ function loadPersistedState() {
     if (num(ex.cf, 0.2, 2.5)) exState.cf = ex.cf;
     if (num(ex.lensLen, 0.05, 0.3)) exState.lensLen = ex.lensLen;
     if (num(ex.gap, 0, 0.15)) exState.gap = ex.gap;
-    if (num(ex.thickness, 0, 0.02)) exState.thickness = ex.thickness;
     if (['PL', 'LPL', 'PV'].includes(ex.mount)) exState.mount = ex.mount;
   }
   const u = document.querySelector(`input[name="unit"][value="${state.unit}"]`);
@@ -1094,44 +1116,47 @@ function styleDistanceInput(input) {
 }
 function onDistanceInput(input) { styleDistanceInput(input); renderOutputs(); }
 function refreshInputHints() {
-  document.querySelectorAll('#lensTable input.dist, #diopterTable input.dist, #mountingGap').forEach(styleDistanceInput);
+  document.querySelectorAll('#lensTable input.dist, #mountingGap').forEach(styleDistanceInput);
 }
 
 /* ---------- diopter set ----------
-   Same pattern as the lens table: rebuilt only on add/remove (so typing keeps
-   focus); per-keystroke strength/thickness edits update state + outputs only.
-   Strength is validated on blur so mid-typing "-" or duplicates don't wipe input. */
-function renderDiopterTable() {
-  document.querySelector('#diopterTable tbody').innerHTML = state.diopters.map(dp => `
-    <tr data-id="${dp.id}">
-      <td><input type="text" class="narrow num" data-field="power" inputmode="text" value="${dp.power === null || dp.power === undefined ? '' : escapeAttr(String(dp.power))}" placeholder="e.g. +1.5 or -0.5"></td>
-      <td><input type="text" class="narrow dist" data-field="thickness" data-defunit="mm" inputmode="decimal" value="${escapeAttr(dp.thickness || '')}" placeholder="e.g. 15mm (optional)"></td>
-      <td><button class="rm" data-act="rm">delete</button></td>
-    </tr>`).join('');
-  refreshInputHints();
+   Each diopter is just a strength now, shown as a small removable chip.
+   Rebuilt only on add/remove (so typing keeps focus); per-keystroke edits
+   update state + outputs only. Validated on blur so mid-typing "-" or a
+   duplicate value doesn't wipe what's been typed. */
+function renderDiopterChips() {
+  const chips = state.diopters.map(dp => `
+    <span class="chip" data-id="${dp.id}">
+      <input type="text" class="chip-input" data-field="power" inputmode="text" value="${dp.power === null || dp.power === undefined ? '' : escapeAttr(String(dp.power))}" placeholder="±" aria-label="Diopter strength">
+      <button class="chip-rm" data-act="rm" aria-label="Remove">&times;</button>
+    </span>`).join('');
+  el('diopterChips').innerHTML = chips + `<button type="button" class="chip-add" id="btnAddDiopter">+ Add diopter</button>`;
+  el('btnAddDiopter').addEventListener('click', () => addDiopter(true));
 }
 function onDiopterPowerInput(id, input) {
   const dp = state.diopters.find(x => x.id === id);
   if (!dp) return;
+  const chip = input.closest('.chip');
   const raw = input.value.trim();
   const val = parseFloat(input.value);
-  if (raw === '') { dp.power = null; input.classList.remove('bad'); }
-  else { dp.power = isNaN(val) ? dp.power : val; input.classList.toggle('bad', isNaN(val) || val === 0); }
+  if (raw === '') { dp.power = null; chip.classList.remove('bad'); }
+  else { dp.power = isNaN(val) ? dp.power : val; chip.classList.toggle('bad', isNaN(val) || val === 0); }
   renderOutputs();
 }
 function onDiopterPowerBlur(id, input) {
   const dp = state.diopters.find(x => x.id === id);
   if (!dp) return;
+  const chip = input.closest('.chip');
   const note = el('diopterNote');
   const raw = input.value.trim();
-  if (raw === '') { dp.power = null; input.classList.remove('bad'); note.hidden = true; renderOutputs(); return; } // leave unfilled
+  if (raw === '') { dp.power = null; chip.classList.remove('bad'); note.hidden = true; renderOutputs(); return; } // leave unfilled
   const val = parseFloat(input.value);
-  if (isNaN(val) || val === 0) { input.value = dp.power === null ? '' : String(dp.power); input.classList.remove('bad'); return; }
+  if (isNaN(val) || val === 0) { input.value = dp.power === null ? '' : String(dp.power); chip.classList.remove('bad'); return; }
   if (state.diopters.some(x => x.id !== id && x.power === val)) {
     // Keep what they typed (no silent revert): flag it and leave it out of
     // the results until it's unique.
     dp.power = null;
-    input.classList.add('bad');
+    chip.classList.add('bad');
     input.title = 'Already in your set';
     note.textContent = `${diopterLabel(val)} is already in your set — the duplicate is ignored until you change it.`;
     note.hidden = false;
@@ -1139,25 +1164,24 @@ function onDiopterPowerBlur(id, input) {
     return;
   }
   dp.power = val;
-  input.classList.remove('bad');
+  chip.classList.remove('bad');
   input.title = '';
   note.hidden = true;
   renderOutputs();
 }
-function onDiopterThicknessInput(id, input) {
-  const dp = state.diopters.find(x => x.id === id);
-  if (dp) dp.thickness = input.value;
-  styleDistanceInput(input);
+function addDiopter(focusNew) {
+  const id = state.nextDiopterId++;
+  state.diopters.push({ id, power: null });
+  renderDiopterChips();
   renderOutputs();
-}
-function addDiopter() {
-  state.diopters.push({ id: state.nextDiopterId++, power: null, thickness: '' });
-  renderDiopterTable();
-  renderOutputs();
+  if (focusNew) {
+    const inp = document.querySelector(`#diopterChips .chip[data-id="${id}"] .chip-input`);
+    if (inp) inp.focus();
+  }
 }
 function removeDiopter(id) {
   state.diopters = state.diopters.filter(x => x.id !== id);
-  renderDiopterTable();
+  renderDiopterChips();
   renderOutputs();
 }
 
@@ -1841,10 +1865,18 @@ function renderResultsTable({ lensData }) {
   renderGapBreakdown(lensData);
 }
 
+// Builds a stacked-fraction span (numerator over denominator) for formula
+// display — used anywhere a "÷" would otherwise appear, in both the worked
+// example and the Explorer's live maths. Arguments may contain further
+// markup (e.g. a nested fraction or a <b> tag).
+function frac(num, den) {
+  return `<span class="frac"><span class="num">${num}</span><span class="den">${den}</span></span>`;
+}
+
 /* Worked example of the diopter-to-film-plane distance. Two dropdowns pick the
    lens and diopter; both auto-fill when only one option exists. Ordered from the
-   camera end: mount flange + lens length + mounting gap, plus half the diopter's
-   glass thickness when given. Labels on one line, matching numbers on the next. */
+   camera end: mount flange + lens length + mounting gap. Labels on one line,
+   matching numbers on the next. */
 function renderGapBreakdown(lensData) {
   const box = el('gapBreakdown');
   const lensSel = el('breakdownLens');
@@ -1867,7 +1899,7 @@ function renderGapBreakdown(lensData) {
   lensSel.value = String(lensIdx);
   const ld = usableLenses[lensIdx];
 
-  // Diopter dropdown — options are this lens's rows. Honour the live selection
+// Diopter dropdown — options are this lens's rows. Honour the live selection
   // if it still points at a valid option; otherwise fall back to matching the
   // previously-shown label (stable across reorders); otherwise first.
   const liveVal = dioSel.value;
@@ -1882,7 +1914,6 @@ function renderGapBreakdown(lensData) {
   dioSel.setAttribute('data-label', exRow.label);
 
   const gp = ld.gapParts;
-  const hasThk = exRow.thickness > 0;
   const mountName = (ld.lens.mount === 'custom' ? 'Custom' : ld.lens.mount) || 'Mount';
   const fromFilmPlane = state.reference === 'filmplane';
 
@@ -1892,11 +1923,7 @@ function renderGapBreakdown(lensData) {
   const fx = state.unit === 'ft' ? fmt : fmtMetric;
   const labels = [`${mountName} flange`, 'Lens length', 'Mounting gap'];
   const values = [fx(gp.flange), fx(gp.lensLen), fx(gp.gap)];
-  if (hasThk) {
-    labels.push('½ diopter glass thickness');
-    values.push(fx(exRow.halfThk));
-  }
-  const sub = hasThk ? exRow.sub : gp.baseSub;
+  const sub = gp.baseSub;
 
   let html =
     `<b>Distance from film plane to diopter</b>` +
@@ -1921,27 +1948,27 @@ function renderGapBreakdown(lensData) {
     html +=
       `<p style="margin:16px 0 2px"><b>The standard formula</b><br>` +
       `<span class="note">Both limits come from the vergence equation for a close-up lens — ` +
-      `<b>1 ÷ new distance = (1 ÷ DS) + diopter strength</b>. Rearranged to give the new distance directly: ` +
-      `<b>new distance = DS ÷ (1 + diopter strength × DS)</b> — the same form as the near limit below. ` +
-      `The far limit is just this with the lens at infinity (DS = ∞), which leaves 1 ÷ diopter strength.</span></p>`;
+      `<b>${frac('1', 'new distance')} = ${frac('1', 'DS')} + diopter strength</b>. Rearranged to give the new distance directly: ` +
+      `<b>new distance = ${frac('DS', '1 + diopter strength × DS')}</b> — the same form as the near limit below. ` +
+      `The far limit is just this with the lens at infinity (DS = ∞), which leaves ${frac('1', 'diopter strength')}.</span></p>`;
 
     html += `<p style="margin:16px 0 2px"><b>Far limit</b></p>`;
     if (d < 0) {
       html += `<div class="calc">Negative diopter  →  far limit = ∞</div>` +
               `<p class="note" style="margin:4px 0 0">A negative diopter shifts the whole focus range outward. ` +
-              `The combination reaches infinity while the lens itself is set to −1 ÷ (${d}) = ${fx(-1 / d)} on its own scale, ` +
+              `The combination reaches infinity while the lens itself is set to −${frac('1', `(${d})`)} = ${fx(-1 / d)} on its own scale, ` +
               `so there is no far cap — only the near limit below applies.</p>`;
     } else if (fromFilmPlane) {
-      html += `<div class="calc">(1 ÷ diopter strength)${addTerm}</div>` +
-              `<div class="calc">(1 ÷ ${d})${addVal}  =  ${fx(exRow.far)}  (${fmtAlt(exRow.far)})</div>`;
+      html += `<div class="calc">${frac('1', 'diopter strength')}${addTerm}</div>` +
+              `<div class="calc">${frac('1', d)}${addVal}  =  ${fx(exRow.far)}  (${fmtAlt(exRow.far)})</div>`;
     } else {
-      html += `<div class="calc">1 ÷ diopter strength</div>` +
-              `<div class="calc">1 ÷ ${d}  =  ${fx(exRow.far)}  (${fmtAlt(exRow.far)})</div>`;
+      html += `<div class="calc">${frac('1', 'diopter strength')}</div>` +
+              `<div class="calc">${frac('1', d)}  =  ${fx(exRow.far)}  (${fmtAlt(exRow.far)})</div>`;
     }
 
     html += `<p style="margin:16px 0 2px"><b>Near limit</b></p>` +
-            `<div class="calc">DS ÷ (1 + diopter strength × DS)${addTerm}</div>` +
-            `<div class="calc">${fx(sd)} ÷ (1 + ${d} × ${sd.toFixed(3)})${addVal}  =  ${fx(exRow.near)}  (${fmtAlt(exRow.near)})</div>` +
+            `<div class="calc">${frac('DS', '1 + diopter strength × DS')}${addTerm}</div>` +
+            `<div class="calc">${frac(fx(sd), `1 + ${d} × ${sd.toFixed(3)}`)}${addVal}  =  ${fx(exRow.near)}  (${fmtAlt(exRow.near)})</div>` +
             `<p class="note" style="margin:4px 0 0">Diopter strength is defined per metre, so DS is used in metres (${sd.toFixed(3)} m) inside the bracket.</p>`;
   }
 
@@ -2190,7 +2217,6 @@ function bindEvents() {
   document.querySelectorAll('input[name="reference"]').forEach(r => r.addEventListener('change', () => setReference(r.value)));
   el('mountingGap').addEventListener('input', e => onDistanceInput(e.target));
 
-  el('btnAddDiopter').addEventListener('click', addDiopter);
   el('btnAddLens').addEventListener('click', () => addLens(true));
   el('btnUndoDelete').addEventListener('click', undoRemove);
   el('btnClearLenses').addEventListener('click', clearAllLenses);
@@ -2249,25 +2275,28 @@ function bindEvents() {
     const tr = target.closest('tr[data-id]');
     return tr ? Number(tr.dataset.id) : null;
   };
+  const chipId = target => {
+    const c = target.closest('.chip[data-id]');
+    return c ? Number(c.dataset.id) : null;
+  };
 
-  const dpBody = document.querySelector('#diopterTable tbody');
-  dpBody.addEventListener('input', e => {
-    const id = rowId(e.target);
-    if (id === null) return;
-    if (e.target.dataset.field === 'power') onDiopterPowerInput(id, e.target);
-    else if (e.target.dataset.field === 'thickness') onDiopterThicknessInput(id, e.target);
+  const dpChips = el('diopterChips');
+  dpChips.addEventListener('input', e => {
+    if (e.target.dataset.field !== 'power') return;
+    const id = chipId(e.target);
+    if (id !== null) onDiopterPowerInput(id, e.target);
   });
   // blur doesn't bubble; focusout does.
-  dpBody.addEventListener('focusout', e => {
+  dpChips.addEventListener('focusout', e => {
     if (e.target.dataset && e.target.dataset.field === 'power') {
-      const id = rowId(e.target);
+      const id = chipId(e.target);
       if (id !== null) onDiopterPowerBlur(id, e.target);
     }
   });
-  dpBody.addEventListener('click', e => {
+  dpChips.addEventListener('click', e => {
     const btn = e.target.closest('button[data-act="rm"]');
     if (!btn) return;
-    const id = rowId(btn);
+    const id = chipId(btn);
     if (id !== null) removeDiopter(id);
   });
 
@@ -2298,7 +2327,7 @@ function bindEvents() {
    "explorer". Physics comes from the same focusLimits() the tables use.
    Follows the app's unit and theme controls; metric distances here read
    in cm. */
-const exState = { D: 1, cf: 0.6, lensLen: 0.150, gap: 0.025, thickness: 0.006, mount: 'PL' };
+const exState = { D: 1, cf: 0.6, lensLen: 0.150, gap: 0.025, mount: 'PL' };
 
 function exCm(m) {
   if (m === Infinity) return '∞';
@@ -2326,7 +2355,7 @@ function fmtBarrelFt(m) {
    the hardware sits at true, proportional positions; LOGARITHMIC from T_LIN
    to DMAX beyond, like a focus barrel; a reserved slot for infinity.
    The two pieces are continuous at T_LIN. Hardware always fits inside the
-   linear zone (flange + lens + gap + glass maxes out around 0.53 m). */
+   linear zone (flange + lens + gap maxes out well under 0.53 m). */
 const EX_CY = 110;
 const X0 = 60, XT = 320, X1 = 690, INF_X = 715;
 const T_LIN = 0.6, DMAX = 10;
@@ -2370,7 +2399,7 @@ function cfLabelText() {
 
 function updateExplorer() {
   const flange = MOUNT_FLANGE[exState.mount];
-  const sub = exState.gap + exState.lensLen + flange + exState.thickness / 2;
+  const sub = exState.gap + exState.lensLen + flange;
   const lim = focusLimits(exState.D, exState.cf, sub, sub);
   const ds = exState.cf - sub;
   const mode = !lim.valid ? 'invalid' : exState.D === 0 ? 'none' : exState.D > 0 ? 'pos' : 'neg';
@@ -2379,7 +2408,7 @@ function updateExplorer() {
   const mountX = X0 + flange * PX_M;
   const frontX = X0 + (flange + exState.lensLen) * PX_M;
   const dioFrontX = X0 + (flange + exState.lensLen + exState.gap) * PX_M;
-  const rx = Math.max(3.5, (exState.thickness / 2) * PX_M); // min size keeps thin glass grabbable
+  const rx = 7; // fixed icon size — glass thickness isn't tracked, so this was never a real measurement
   const dioCX = dioFrontX + rx;
 
   el('camBody').setAttribute('x', mountX - 52);
@@ -2445,17 +2474,16 @@ function updateExplorer() {
   el('outCF').textContent = exFmt(exState.cf);
   el('outLen').textContent = exMm(exState.lensLen);
   el('outGap').textContent = exMm(exState.gap);
-  el('outThk').textContent = exMm(exState.thickness);
   el('outMount').textContent = exMm(flange);
 
   /* live maths */
-  el('mathSub').textContent = `sub = flange + lens length + gap + ½ glass  =  ${exMm(flange)} + ${exMm(exState.lensLen)} + ${exMm(exState.gap)} + ${exMm(exState.thickness / 2)}  =  ${exMm(sub)}`;
+  el('mathSub').textContent = `sub = flange + lens length + gap  =  ${exMm(flange)} + ${exMm(exState.lensLen)} + ${exMm(exState.gap)}  =  ${exMm(sub)}`;
   el('mathDS').textContent = `DS  = close focus − sub  =  ${exFmt(exState.cf)} − ${exMm(sub)}  =  ${ds > 0 ? exFmt(ds) : '— (' + (lim.invalidReason || 'n/a') + ')'}`;
   if (lim.valid && mode !== 'none') {
-    el('mathNear').textContent = `near = DS ÷ (1 + D × DS) + sub  =  ${ds.toFixed(3)} ÷ (1 + ${exState.D} × ${ds.toFixed(3)}) + ${exMm(sub)}  =  ${exFmt(lim.near)}`;
-    el('mathFar').textContent = mode === 'pos'
-      ? `far  = 1 ÷ D + sub  =  1 ÷ ${exState.D} + ${exMm(sub)}  =  ${exFmt(lim.far)}`
-      : `far  = ∞  (negative diopter — the lens reaches infinity at DS = −1 ÷ ${exState.D} = ${exFmt(-1 / exState.D)})`;
+    el('mathNear').innerHTML = `near = ${frac('DS', '1 + D × DS')} + sub  =  ${frac(ds.toFixed(3), `1 + ${exState.D} × ${ds.toFixed(3)}`)} + ${exMm(sub)}  =  ${exFmt(lim.near)}`;
+    el('mathFar').innerHTML = mode === 'pos'
+      ? `far  = ${frac('1', 'D')} + sub  =  ${frac('1', exState.D)} + ${exMm(sub)}  =  ${exFmt(lim.far)}`
+      : `far  = ∞  (negative diopter — the lens reaches infinity at DS = −${frac('1', exState.D)} = ${exFmt(-1 / exState.D)})`;
   } else if (mode === 'none') {
     el('mathNear').textContent = `near = close focus  =  ${exFmt(exState.cf)}  (no diopter fitted)`;
     el('mathFar').textContent = `far  = ∞  (no diopter fitted)`;
@@ -2479,7 +2507,6 @@ function syncExplorerSliders() {
   el('inCF').value = exState.cf;
   el('inLen').value = Math.round(exState.lensLen * 1000);
   el('inGap').value = Math.round(exState.gap * 1000);
-  el('inThk').value = exState.thickness * 1000;
   el('inMount').value = exState.mount;
 }
 
@@ -2488,14 +2515,9 @@ function bindExplorer() {
   el('inCF').addEventListener('input', e => { exState.cf = parseFloat(e.target.value); updateExplorer(); });
   el('inLen').addEventListener('input', e => { exState.lensLen = parseFloat(e.target.value) / 1000; updateExplorer(); });
   el('inGap').addEventListener('input', e => { exState.gap = parseFloat(e.target.value) / 1000; updateExplorer(); });
-  el('inThk').addEventListener('input', e => { exState.thickness = parseFloat(e.target.value) / 1000; updateExplorer(); });
   el('inMount').addEventListener('change', e => { exState.mount = e.target.value; updateExplorer(); });
   document.querySelectorAll('.presets button[data-d]').forEach(b => b.addEventListener('click', () => {
     exState.D = parseFloat(b.dataset.d);
-    // Match the strength against the main diopter table: if that exact
-    // power exists there, borrow its glass thickness; otherwise 0.
-    const match = state.diopters.find(dp => dp.power === exState.D);
-    exState.thickness = match ? diopterThicknessMeters(match) : 0;
     syncExplorerSliders(); updateExplorer();
   }));
   el('btnJumpExplorer').addEventListener('click', () => {
@@ -2570,14 +2592,20 @@ function bindExplorer() {
 bindEvents();
 initSavedSets();
 loadPersistedState();
-setTheme(state.theme); // applies the html attribute + button label
+// No saved preference yet: default to light on larger screens (>=900px),
+// dark otherwise — kept in sync with the pre-paint script in <head>, which
+// made the same call before first paint to avoid a flash. Applied with
+// persist:false so it keeps re-deciding on every fresh visit until the
+// user explicitly picks a theme with the toggle button.
+if (!themeIsExplicit) state.theme = window.innerWidth >= 900 ? 'light' : 'dark';
+setTheme(state.theme, { persist: false }); // applies the html attribute + button label
 refreshUndoButton();
 el('versionNote').textContent = APP_VERSION;
 
 const feedbackSubject = encodeURIComponent(`Diopter Calc feedback (${APP_VERSION})`);
 const feedbackBody = encodeURIComponent(`Version: ${APP_VERSION}\n\n(Describe the bug or suggestion here)\n`);
 el('feedbackLink').href = `mailto:irwinsamj@gmail.com?subject=${feedbackSubject}&body=${feedbackBody}`;
-renderDiopterTable();
+renderDiopterChips();
 if (state.lenses.length) { renderLensTable(); renderOutputs(); }
 else addLens(false); // first visit: start with one empty row (no focus — don't pop the keyboard on load)
 bindExplorer();
