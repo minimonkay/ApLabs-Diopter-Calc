@@ -415,7 +415,7 @@ try {
 
     <div class="control">
       <div class="label">Mounting gap</div>
-      <input type="text" class="narrow dist" id="mountingGap" data-defunit="mm" inputmode="decimal" placeholder="e.g. 1&quot; or 3mm">
+      <input type="text" class="narrow dist" id="mountingGap" data-defunit="mm" placeholder="e.g. 1&quot; or 3mm">
     </div>
   </div>
 
@@ -718,7 +718,7 @@ try {
 <script>
 'use strict';
 // [pure-core-start]
-const APP_VERSION = 'v1.36'; // bump the decimal on every revision — shown next to the title
+const APP_VERSION = 'v1.37'; // bump the decimal on every revision — shown next to the title
 const M_PER_FT = 0.3048;
 
 /* Flange focal depth by mount type — the fixed distance from the mount's contact
@@ -1308,13 +1308,13 @@ function renderLensTable() {
       `<option value="${m}"${mount === m ? ' selected' : ''}>${m === 'custom' ? 'Custom…' : m}</option>`
     ).join('');
     const customField = mount === 'custom'
-      ? `<input type="text" class="dist" data-field="mountCustom" data-defunit="mm" inputmode="decimal" style="width:70px;margin-top:3px" value="${escapeAttr(l.mountCustom || '')}" placeholder="flange, e.g. 40mm">`
+      ? `<input type="text" class="dist" data-field="mountCustom" data-defunit="mm" style="width:70px;margin-top:3px" value="${escapeAttr(l.mountCustom || '')}" placeholder="flange, e.g. 40mm">`
       : '';
     return `
     <tr data-id="${l.id}">
       <td><input type="text" class="narrow lens-name" data-field="name" value="${escapeAttr(l.name)}" placeholder="e.g. 35mm Master Prime"></td>
-      <td><input type="text" class="narrow dist" data-field="cf" data-defunit="in" inputmode="decimal" value="${escapeAttr(l.cf)}" placeholder="e.g. 18&quot;"></td>
-      <td><input type="text" class="narrow dist" data-field="lensLen" data-defunit="mm" inputmode="decimal" value="${escapeAttr(l.lensLen)}" placeholder="e.g. 200mm"></td>
+      <td><input type="text" class="narrow dist" data-field="cf" data-defunit="in" value="${escapeAttr(l.cf)}" placeholder="e.g. 18&quot;"></td>
+      <td><input type="text" class="narrow dist" data-field="lensLen" data-defunit="mm" value="${escapeAttr(l.lensLen)}" placeholder="e.g. 200mm"></td>
       <td><select data-field="mount"><option value=""${mount === '' ? ' selected' : ''}>—</option>${mountOptions}</select>${customField ? '<br>' + customField : ''}</td>
       <td><button class="mv" data-act="mv" data-dir="-1" title="Move up" aria-label="Move up"${i > 0 ? '' : ' disabled'}>▲</button><button class="mv" data-act="mv" data-dir="1" title="Move down" aria-label="Move down"${i < last ? '' : ' disabled'}>▼</button><button class="rm" data-act="rm">delete</button></td>
     </tr>`;
